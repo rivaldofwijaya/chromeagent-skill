@@ -27,6 +27,83 @@ else
   _fail "default flags are out of order"
 fi
 
+test_case "setup claude: --out-dir writes into the named directory, not cwd"
+stub_cmd uname 'echo Darwin'
+stub_cmd npx 'exit 0'
+out_dir="$SANDBOX/target"
+mkdir "$out_dir"
+out=$(run_setup --agent claude --out-dir "$out_dir")
+rc=$?
+assert_setup_rc 0 "$rc"
+if [ -f "$out_dir/.mcp.json" ]; then _ok "named directory received .mcp.json"; else _fail "named directory did not receive .mcp.json"; fi
+if [ ! -e "$SANDBOX/project/.mcp.json" ]; then _ok "cwd did not receive .mcp.json"; else _fail "cwd received .mcp.json"; fi
+
+test_case "setup claude: --out-dir rejects a nonexistent directory"
+stub_cmd uname 'echo Darwin'
+stub_cmd npx 'exit 0'
+out_dir="$SANDBOX/missing"
+out=$(run_setup --agent claude --out-dir "$out_dir")
+rc=$?
+assert_setup_rc 2 "$rc"
+assert_contains "setup-mcp: --out-dir $out_dir is not a directory" "$out"
+if [ ! -e "$out_dir" ]; then _ok "nonexistent directory was not created"; else _fail "nonexistent directory was created"; fi
+if [ ! -e "$SANDBOX/project/.mcp.json" ]; then _ok "cwd was not written"; else _fail "cwd was written"; fi
+
+test_case "setup claude: --out-dir rejects a file"
+stub_cmd uname 'echo Darwin'
+stub_cmd npx 'exit 0'
+out_dir="$SANDBOX/not-a-directory"
+printf '%s\n' original > "$out_dir"
+out=$(run_setup --agent claude --out-dir "$out_dir")
+rc=$?
+assert_setup_rc 2 "$rc"
+assert_contains "setup-mcp: --out-dir $out_dir is not a directory" "$out"
+if [ -f "$out_dir" ] && [ "$(cat "$out_dir")" = original ]; then
+  _ok "file target was left untouched"
+else
+  _fail "file target was changed"
+fi
+
+test_case "setup claude: default output directory remains cwd"
+stub_cmd uname 'echo Darwin'
+stub_cmd npx 'exit 0'
+run_setup --agent claude >/dev/null
+rc=$?
+assert_setup_rc 0 "$rc"
+if [ -f "$SANDBOX/project/.mcp.json" ]; then _ok "cwd received .mcp.json"; else _fail "cwd did not receive .mcp.json"; fi
+
+test_case "setup claude: success message names the absolute target"
+stub_cmd uname 'echo Darwin'
+stub_cmd npx 'exit 0'
+out=$(run_setup --agent claude)
+rc=$?
+assert_setup_rc 0 "$rc"
+assert_contains "$SANDBOX/project/.mcp.json" "$out"
+assert_not_contains 'wrote ./' "$out"
+
+test_case "setup claude: merge message names the absolute target"
+stub_cmd uname 'echo Darwin'
+stub_cmd npx 'exit 0'
+if link_host_tool node; then
+  printf '%s\n' '{"mcpServers":{"other-server":{"command":"other"}}}' > "$SANDBOX/project/.mcp.json"
+  out=$(run_setup --agent claude)
+  rc=$?
+  assert_setup_rc 0 "$rc"
+  assert_contains "$SANDBOX/project/.mcp.json" "$out"
+else
+  _fail "host node unavailable"
+fi
+
+test_case "setup: help documents --out-dir"
+out=$(run_setup --help)
+rc=$?
+assert_setup_rc 0 "$rc"
+usage='usage: setup-mcp.sh --agent auto|claude|codex|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact]'
+case "$out" in
+  *"$usage"*) _ok "usage includes --out-dir" ;;
+  *) _fail "usage does not include --out-dir" ;;
+esac
+
 test_case "setup claude: --no-redact omits the redaction flag"
 stub_cmd uname 'echo Darwin'
 stub_cmd npx 'exit 0'
@@ -112,7 +189,7 @@ out=$(run_setup --agent claude)
 rc=$?
 chmod 700 "$SANDBOX/project"
 assert_setup_rc 3 "$rc"
-assert_not_contains 'wrote ./.mcp.json' "$out"
+assert_not_contains "wrote $SANDBOX/project/.mcp.json" "$out"
 
 test_case "setup claude: an existing file is merged, not clobbered"
 stub_cmd uname 'echo Darwin'
@@ -191,7 +268,7 @@ out=$(run_setup --agent opencode)
 rc=$?
 chmod 700 "$SANDBOX/project"
 assert_setup_rc 3 "$rc"
-assert_not_contains 'wrote ./opencode.json' "$out"
+assert_not_contains "wrote $SANDBOX/project/opencode.json" "$out"
 
 test_case "setup opencode: merges into an existing opencode.json under the mcp key"
 stub_cmd uname 'echo Darwin'
@@ -346,6 +423,16 @@ stub_cmd npx 'exit 0'
 out=$(run_setup_timeout 5 --agent claude --channel)
 assert_contains 'rc=2' "$out"
 
+test_case "setup: a trailing --out-dir is a usage error, not an infinite loop"
+stub_cmd uname 'echo Darwin'
+stub_cmd npx 'exit 0'
+out=$(run_setup_timeout 5 --agent claude --out-dir)
+assert_contains 'rc=2' "$out"
+out=$(run_setup --agent claude --out-dir)
+rc=$?
+assert_setup_rc 2 "$rc"
+assert_contains 'setup-mcp: --out-dir requires a value' "$out"
+
 test_case "setup: repeated options are usage errors and terminate"
 stub_cmd uname 'echo Darwin'
 stub_cmd npx 'exit 0'
@@ -355,8 +442,18 @@ out=$(run_setup_timeout 5 --runner bunx --runner pnpm)
 assert_contains 'rc=2' "$out"
 out=$(run_setup_timeout 5 --channel beta --channel dev)
 assert_contains 'rc=2' "$out"
+out=$(run_setup_timeout 5 --out-dir "$SANDBOX/project" --out-dir "$SANDBOX/project")
+assert_contains 'rc=2' "$out"
 out=$(run_setup_timeout 5 --no-redact --no-redact)
 assert_contains 'rc=2' "$out"
+
+test_case "setup: repeated --out-dir is a usage error"
+stub_cmd uname 'echo Darwin'
+stub_cmd npx 'exit 0'
+out=$(run_setup --agent claude --out-dir "$SANDBOX/project" --out-dir "$SANDBOX/project")
+rc=$?
+assert_setup_rc 2 "$rc"
+assert_contains 'setup-mcp: repeated option --out-dir' "$out"
 
 test_case "setup: empty and option-looking values terminate"
 stub_cmd uname 'echo Darwin'
@@ -365,6 +462,10 @@ out=$(run_setup_timeout 5 --agent "")
 assert_contains 'rc=2' "$out"
 out=$(run_setup_timeout 5 --channel "")
 assert_contains 'rc=2' "$out"
+out=$(run_setup --out-dir "")
+rc=$?
+assert_setup_rc 2 "$rc"
+assert_contains 'setup-mcp: --out-dir requires a value' "$out"
 out=$(run_setup_timeout 5 --runner --agent)
 assert_contains 'rc=0' "$out"
 out=$(run_setup_timeout 5 --)

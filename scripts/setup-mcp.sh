@@ -1,17 +1,20 @@
 #!/bin/sh
 # setup-mcp.sh — write a project-scope chrome-devtools MCP entry.
 # Usage: setup-mcp.sh --agent auto|claude|codex|opencode
-#                     [--runner "<argv>"] [--channel beta|dev|canary] [--no-redact]
+#                     [--runner "<argv>"] [--channel beta|dev|canary]
+#                     [--out-dir <dir>] [--no-redact]
 set -u
 
 AGENT=auto
 RUNNER_OVERRIDE=""
 CHANNEL=""
 CHANNEL_SET=no
+OUT_DIR_ARG=""
 REDACT=yes
 SEEN_AGENT=no
 SEEN_RUNNER=no
 SEEN_CHANNEL=no
+SEEN_OUT_DIR=no
 SEEN_NO_REDACT=no
 
 # A value-taking option with no value left is a usage error, not a shift.
@@ -43,12 +46,19 @@ while [ $# -gt 0 ]; do
       SEEN_CHANNEL=yes
       need_value --channel $#; CHANNEL="$2"; CHANNEL_SET=yes; shift 2
       ;;
+    --out-dir)
+      [ "$SEEN_OUT_DIR" = no ] || { printf 'setup-mcp: repeated option %s\n' "$1" >&2; exit 2; }
+      SEEN_OUT_DIR=yes
+      need_value --out-dir $#
+      [ -n "$2" ] || { printf 'setup-mcp: --out-dir requires a value\n' >&2; exit 2; }
+      OUT_DIR_ARG="$2"; shift 2
+      ;;
     --no-redact)
       [ "$SEEN_NO_REDACT" = no ] || { printf 'setup-mcp: repeated option %s\n' "$1" >&2; exit 2; }
       SEEN_NO_REDACT=yes
       REDACT=no; shift
       ;;
-    -h|--help) printf 'usage: setup-mcp.sh --agent auto|claude|codex|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--no-redact]\n'; exit 0 ;;
+    -h|--help) printf 'usage: setup-mcp.sh --agent auto|claude|codex|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact]\n'; exit 0 ;;
     *) printf 'setup-mcp: unknown option %s\n' "$1" >&2; exit 2 ;;
   esac
 done
@@ -63,6 +73,22 @@ if [ "$CHANNEL_SET" = yes ]; then
     beta|dev|canary) : ;;
     *) printf 'setup-mcp: invalid channel %s\n' "$CHANNEL" >&2; exit 2 ;;
   esac
+fi
+
+if [ "$SEEN_OUT_DIR" = yes ]; then
+  out_dir_to_resolve="$OUT_DIR_ARG"
+else
+  out_dir_to_resolve=.
+fi
+if OUT_DIR=$(cd -- "$out_dir_to_resolve" 2>/dev/null && pwd); then
+  :
+else
+  if [ "$SEEN_OUT_DIR" = yes ]; then
+    printf 'setup-mcp: --out-dir %s is not a directory\n' "$out_dir_to_resolve" >&2
+  else
+    printf 'setup-mcp: %s is not a directory\n' "$out_dir_to_resolve" >&2
+  fi
+  exit 2
 fi
 
 # Prints "command|arg arg ..." — the launcher prefix.
@@ -162,7 +188,7 @@ write_claude() {
   cmd=${rc%%|*}
   prefix=${rc#*|}
   args=$(args_json "$prefix")
-  target="./.mcp.json"
+  target="$OUT_DIR/.mcp.json"
 
   if [ ! -f "$target" ]; then
     claude_snippet "$cmd" "$args" > "$target"
@@ -260,7 +286,7 @@ merge_opencode_with_node() {
 
 write_opencode() {
   cj=$(command_json)
-  target="./opencode.json"
+  target="$OUT_DIR/opencode.json"
 
   if [ ! -f "$target" ]; then
     opencode_snippet "$cj" > "$target"
@@ -311,8 +337,8 @@ write_codex() {
 # Prints the agents in play, space separated.
 detect_agents() {
   found=""
-  { [ -f ./.mcp.json ] || [ -d ./.claude ] || command -v claude >/dev/null 2>&1; } && found="$found claude"
-  { [ -f ./opencode.json ] || command -v opencode >/dev/null 2>&1; } && found="$found opencode"
+  { [ -f "$OUT_DIR/.mcp.json" ] || [ -d "$OUT_DIR/.claude" ] || command -v claude >/dev/null 2>&1; } && found="$found claude"
+  { [ -f "$OUT_DIR/opencode.json" ] || command -v opencode >/dev/null 2>&1; } && found="$found opencode"
   { [ -f "$HOME/.codex/config.toml" ] || command -v codex >/dev/null 2>&1; } && found="$found codex"
   [ -n "$found" ] || found=" claude"
   printf '%s\n' "${found# }"
