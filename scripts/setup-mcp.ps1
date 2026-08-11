@@ -32,10 +32,12 @@ $Runner = ''
 $Channel = ''
 $ChannelSet = $false
 $NoRedact = $false
+$OutDir = ''
+$OutDirSet = $false
 $seenOptions = @{}
 
 function Write-Usage {
-  Write-Info 'usage: setup-mcp.ps1 -Agent auto|claude|codex|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-NoRedact]'
+  Write-Info 'usage: setup-mcp.ps1 -Agent auto|claude|codex|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact]'
 }
 
 # Parse by index. Every non-exit path advances by one or two positions, so a
@@ -128,6 +130,34 @@ while ($index -lt $rawArguments.Count) {
     continue
   }
 
+  if ($optionName -ieq '-OutDir') {
+    if ($seenOptions.ContainsKey('OutDir')) {
+      Write-ErrorLine 'setup-mcp: repeated option -OutDir'
+      exit 2
+    }
+    $seenOptions['OutDir'] = $true
+    $OutDirSet = $true
+    if ($hasAttachedValue) {
+      if ($attachedValue.Length -eq 0) {
+        Write-ErrorLine 'setup-mcp: -OutDir requires a value'
+        exit 2
+      }
+      $OutDir = $attachedValue
+      $index += 1
+    } elseif (($index + 1) -ge $rawArguments.Count) {
+      Write-ErrorLine 'setup-mcp: -OutDir requires a value'
+      exit 2
+    } else {
+      $OutDir = [string]$rawArguments[$index + 1]
+      if ($OutDir.Length -eq 0) {
+        Write-ErrorLine 'setup-mcp: -OutDir requires a value'
+        exit 2
+      }
+      $index += 2
+    }
+    continue
+  }
+
   if ($optionName -ieq '-NoRedact') {
     if ($seenOptions.ContainsKey('NoRedact')) {
       Write-ErrorLine "setup-mcp: repeated option $option"
@@ -161,6 +191,23 @@ if (@('auto', 'claude', 'codex', 'opencode') -cnotcontains $Agent) {
 }
 if ($ChannelSet -and @('beta', 'dev', 'canary') -cnotcontains $Channel) {
   Write-ErrorLine "setup-mcp: invalid channel $Channel"
+  exit 2
+}
+
+$resolvedOutDir = $null
+$outDirToResolve = if ($OutDirSet) { $OutDir } else { '.' }
+try {
+  $resolvedPath = Resolve-Path -LiteralPath $outDirToResolve -ErrorAction Stop
+  if (-not (Test-Path -LiteralPath $resolvedPath.Path -PathType Container)) {
+    throw 'not a directory'
+  }
+  $resolvedOutDir = $resolvedPath.Path
+} catch {
+  if ($OutDirSet) {
+    Write-ErrorLine "setup-mcp: -OutDir $outDirToResolve is not a directory"
+  } else {
+    Write-ErrorLine "setup-mcp: $outDirToResolve is not a directory"
+  }
   exit 2
 }
 
@@ -295,7 +342,7 @@ function Write-JsonFile([string]$Path, $Document) {
 # PowerShell can always merge safely, so the sh manual-merge branch is unused;
 # its exit 3 remains defined for other merge failures, not this branch.
 function Write-Claude {
-  $target = './.mcp.json'
+  $target = Join-Path $resolvedOutDir '.mcp.json'
   $hadFile = Test-Path -LiteralPath $target -PathType Leaf
   try {
     $r = Get-RunnerParts
@@ -318,7 +365,7 @@ function Write-Claude {
 }
 
 function Write-Opencode {
-  $target = './opencode.json'
+  $target = Join-Path $resolvedOutDir 'opencode.json'
   $hadFile = Test-Path -LiteralPath $target -PathType Leaf
   try {
     $r = Get-RunnerParts
@@ -371,12 +418,15 @@ function Write-Codex {
 
 function Get-DetectedAgents {
   $found = @()
-  if ((Test-Path -LiteralPath './.mcp.json' -PathType Leaf) -or
-      (Test-Path -LiteralPath './.claude' -PathType Container) -or
+  $claudeConfigPath = Join-Path $resolvedOutDir '.mcp.json'
+  $claudeMarkerPath = Join-Path $resolvedOutDir '.claude'
+  if ((Test-Path -LiteralPath $claudeConfigPath -PathType Leaf) -or
+      (Test-Path -LiteralPath $claudeMarkerPath -PathType Container) -or
       (Get-Command claude -ErrorAction SilentlyContinue)) {
     $found += 'claude'
   }
-  if ((Test-Path -LiteralPath './opencode.json' -PathType Leaf) -or
+  $opencodeConfigPath = Join-Path $resolvedOutDir 'opencode.json'
+  if ((Test-Path -LiteralPath $opencodeConfigPath -PathType Leaf) -or
       (Get-Command opencode -ErrorAction SilentlyContinue)) {
     $found += 'opencode'
   }

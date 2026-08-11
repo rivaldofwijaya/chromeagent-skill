@@ -113,6 +113,108 @@ assert_contains 'chrome-devtools' "$body"
 assert_contains 'autoConnect' "$body"
 assert_contains 'redactNetworkHeaders' "$body"
 
+test_case "ps1 setup: -OutDir writes into the named directory, not cwd"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+out_dir="$SANDBOX/target"
+mkdir "$out_dir"
+out=$(run_setup_ps1 -Agent claude -OutDir "$out_dir")
+rc=$?
+if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
+if [ -f "$out_dir/.mcp.json" ]; then _ok "named directory received .mcp.json"; else _fail "named directory did not receive .mcp.json"; fi
+if [ ! -e "$SANDBOX/project/.mcp.json" ]; then _ok "cwd did not receive .mcp.json"; else _fail "cwd received .mcp.json"; fi
+
+test_case "ps1 setup: attached -OutDir value writes into the named directory"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+out_dir="$SANDBOX/target"
+mkdir "$out_dir"
+out=$(run_setup_ps1 -Agent opencode "-OutDir:$out_dir")
+rc=$?
+if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
+if [ -f "$out_dir/opencode.json" ]; then _ok "attached value directory received opencode.json"; else _fail "attached value directory did not receive opencode.json"; fi
+if [ ! -e "$SANDBOX/project/opencode.json" ]; then _ok "cwd did not receive opencode.json"; else _fail "cwd received opencode.json"; fi
+
+test_case "ps1 setup: -OutDir rejects a nonexistent directory"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+out_dir="$SANDBOX/missing"
+out=$(run_setup_ps1 -Agent claude -OutDir "$out_dir")
+rc=$?
+if [ "$rc" -eq 2 ]; then _ok "exit 2"; else _fail "expected exit 2, got $rc"; fi
+assert_contains "setup-mcp: -OutDir $out_dir is not a directory" "$out"
+if [ ! -e "$out_dir" ]; then _ok "nonexistent directory was not created"; else _fail "nonexistent directory was created"; fi
+if [ ! -e "$SANDBOX/project/.mcp.json" ]; then _ok "cwd was not written"; else _fail "cwd was written"; fi
+
+test_case "ps1 setup: -OutDir rejects a file"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+out_dir="$SANDBOX/not-a-directory"
+printf '%s\n' original > "$out_dir"
+out=$(run_setup_ps1 -Agent claude -OutDir "$out_dir")
+rc=$?
+if [ "$rc" -eq 2 ]; then _ok "exit 2"; else _fail "expected exit 2, got $rc"; fi
+assert_contains "setup-mcp: -OutDir $out_dir is not a directory" "$out"
+if [ -f "$out_dir" ] && [ "$(cat "$out_dir")" = original ]; then
+  _ok "file target was left untouched"
+else
+  _fail "file target was changed"
+fi
+
+test_case "ps1 setup: default output directory remains cwd"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+run_setup_ps1 -Agent claude >/dev/null
+rc=$?
+if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
+if [ -f "$SANDBOX/project/.mcp.json" ]; then _ok "cwd received .mcp.json"; else _fail "cwd did not receive .mcp.json"; fi
+
+test_case "ps1 setup: success message names the absolute target"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+out=$(run_setup_ps1 -Agent claude)
+rc=$?
+if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
+assert_contains "setup-mcp: wrote $SANDBOX/project/.mcp.json" "$out"
+assert_not_contains 'wrote ./' "$out"
+
+test_case "ps1 setup: merge message names the absolute target"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+printf '%s\n' '{"mcpServers":{"other-server":{"command":"other"}}}' > "$SANDBOX/project/.mcp.json"
+out=$(run_setup_ps1 -Agent claude)
+rc=$?
+if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
+assert_contains "setup-mcp: merged chrome-devtools into $SANDBOX/project/.mcp.json" "$out"
+assert_not_contains 'merged chrome-devtools into ./' "$out"
+
+test_case "ps1 setup: auto probes and writes the resolved output directory"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+out_dir="$SANDBOX/target"
+mkdir "$out_dir"
+printf '%s\n' '{"mcpServers":{}}' > "$out_dir/.mcp.json"
+out=$(run_setup_ps1 -Agent auto -OutDir "$out_dir")
+rc=$?
+if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
+assert_contains 'chrome-devtools' "$(cat "$out_dir/.mcp.json")"
+if [ ! -e "$SANDBOX/project/.mcp.json" ]; then _ok "cwd was not written"; else _fail "cwd was written"; fi
+
+test_case "ps1 setup: -OutDir is ignored for codex"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+stub_cmd codex 'exit 0'
+out_dir="$SANDBOX/target"
+mkdir "$out_dir"
+out=$(run_setup_ps1 -Agent codex -OutDir "$out_dir")
+rc=$?
+if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
+if [ ! -e "$out_dir/.mcp.json" ] && [ ! -e "$out_dir/opencode.json" ]; then
+  _ok "output directory was not used by codex"
+else
+  _fail "codex wrote a project config"
+fi
+
 test_case "ps1 setup: -NoRedact omits the redaction flag"
 link_host_tool pwsh
 stub_cmd npx 'exit 0'
@@ -218,6 +320,25 @@ assert_contains 'rc=2' "$out"
 out=$(run_setup_ps1_timeout 5 -NoRedact -NoRedact)
 assert_contains 'rc=2' "$out"
 
+test_case "ps1 setup: a repeated -OutDir is a usage error"
+link_host_tool pwsh
+out=$(run_setup_ps1 -Agent claude -OutDir "$SANDBOX/project" -OutDir "$SANDBOX/project")
+rc=$?
+if [ "$rc" -eq 2 ]; then _ok "exit 2"; else _fail "expected exit 2, got $rc"; fi
+assert_contains 'setup-mcp: repeated option -OutDir' "$out"
+
+test_case "ps1 setup: a trailing -OutDir is a usage error, not an infinite loop"
+link_host_tool pwsh
+out=$(run_setup_ps1_timeout 5 -Agent claude -OutDir)
+assert_contains 'rc=2' "$out"
+
+test_case "ps1 setup: an empty -OutDir value reports its parser diagnostic"
+link_host_tool pwsh
+out=$(run_setup_ps1 -Agent claude -OutDir "")
+rc=$?
+if [ "$rc" -eq 2 ]; then _ok "exit 2"; else _fail "expected exit 2, got $rc"; fi
+assert_contains 'setup-mcp: -OutDir requires a value' "$out"
+
 test_case "ps1 setup: empty and option-looking values terminate"
 link_host_tool pwsh
 stub_cmd npx 'exit 0'
@@ -239,15 +360,16 @@ assert_contains 'setup-mcp: unknown option --' "$out"
 
 test_case "ps1 setup: -h and --help print usage and exit 0"
 link_host_tool pwsh
+usage='usage: setup-mcp.ps1 -Agent auto|claude|codex|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact]'
 out=$(run_setup_ps1 -h)
 rc=$?
 if [ "$rc" -eq 0 ]; then _ok "-h exits 0"; else _fail "expected -h exit 0, got $rc"; fi
-assert_contains 'usage: setup-mcp.ps1 -Agent' "$out"
+if printf "%s\n" "$out" | grep -F -q -- "$usage"; then _ok "usage is exact"; else _fail "usage is not exact"; fi
 assert_not_contains 'setup-mcp.sh' "$out"
 out=$(run_setup_ps1 --help)
 rc=$?
 if [ "$rc" -eq 0 ]; then _ok "--help exits 0"; else _fail "expected --help exit 0, got $rc"; fi
-assert_contains 'usage: setup-mcp.ps1 -Agent' "$out"
+if printf "%s\n" "$out" | grep -F -q -- "$usage"; then _ok "usage is exact"; else _fail "usage is not exact"; fi
 assert_not_contains 'setup-mcp.sh' "$out"
 
 test_case "ps1 setup: invalid JSON is left untouched"
