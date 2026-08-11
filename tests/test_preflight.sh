@@ -325,3 +325,47 @@ out=$(run_preflight)
 assert_kv DEBUG_PORT 9222 "$out"
 assert_kv DEBUG_REACHABLE unknown "$out"
 assert_status NEEDS_OPT_IN "$out"
+
+# fake_ps CMDLINE... — a process table the pgrep stub matches its -f pattern against,
+# the way real pgrep matches a full command line.
+fake_ps() {
+  : > "$SANDBOX/proctable"
+  for line do printf '%s\n' "$line" >> "$SANDBOX/proctable"; done
+  stub_cmd pgrep 'shift; grep -E -- "$1" "'"$SANDBOX"'/proctable" >/dev/null || exit 1'
+}
+
+test_case "runtime: another chromium browser is not mistaken for chrome"
+configured_chrome
+fake_ps '/Applications/Brave Browser.app/Contents/Frameworks/Brave Browser Framework.framework/Versions/151.1.93.132/Helpers/chrome_crashpad_handler --database=/tmp'
+out=$(run_preflight)
+assert_kv CHROME_RUNNING no "$out"
+assert_status CHROME_NOT_RUNNING "$out"
+
+test_case "runtime: an unrelated process naming chrome is not a running chrome"
+configured_chrome
+fake_ps 'node /Users/x/.npm/_npx/abc/node_modules/chrome-devtools-mcp/build/src/index.js --autoConnect' \
+        'node /opt/tool/server.mjs --cwd /Volumes/R/projects/chromeagent-skill'
+out=$(run_preflight)
+assert_kv CHROME_RUNNING no "$out"
+assert_status CHROME_NOT_RUNNING "$out"
+
+test_case "runtime: the ps fallback is as discriminating as pgrep"
+configured_chrome
+stub_cmd ps 'printf "%s\n" "/Applications/Brave Browser.app/Contents/Frameworks/Helpers/chrome_crashpad_handler"'
+out=$(run_preflight)
+assert_kv CHROME_RUNNING no "$out"
+
+test_case "runtime: the ps fallback still finds the real chrome binary"
+configured_chrome
+stub_cmd ps "printf '%s\n' '$CHROMEAGENT_ROOT/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'"
+out=$(run_preflight)
+assert_kv CHROME_RUNNING yes "$out"
+
+test_case "runtime: the real chrome binary is still detected as running"
+configured_chrome
+fake_ps "$CHROMEAGENT_ROOT/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+        '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser'
+stub_cmd curl 'exit 7'
+out=$(run_preflight)
+assert_kv CHROME_RUNNING yes "$out"
+assert_status NEEDS_OPT_IN "$out"

@@ -165,8 +165,12 @@ scan_config() {
   return 1
 }
 
-# Exit 0 when a Chrome/Chromium process appears to be running.
+# chrome_running PLATFORM CHROME_PATH — exit 0 when that exact binary is running.
+# Matching the resolved path, not the substring "chrom", keeps other Chromium
+# browsers, the MCP server itself, and any process whose arguments merely mention
+# chrome out of the verdict.
 chrome_running() {
+  [ -n "${2:-}" ] && [ "$2" != none ] || return 1
   if [ "$1" = windows ]; then
     if command -v tasklist >/dev/null 2>&1; then
       tasklist 2>/dev/null | grep -qi 'chrome.exe' && return 0
@@ -174,11 +178,11 @@ chrome_running() {
     return 1
   fi
   if command -v pgrep >/dev/null 2>&1; then
-    pgrep -f '[Cc]hrom' >/dev/null 2>&1 && return 0
+    pgrep -f "$(printf '%s' "$2" | sed 's/[.[$^*+?(){}|]/\\&/g')" >/dev/null 2>&1 && return 0
     return 1
   fi
   if command -v ps >/dev/null 2>&1; then
-    ps ax 2>/dev/null | grep -v grep | grep -qi 'chrom' && return 0
+    ps ax 2>/dev/null | grep -v grep | grep -qF "$2" && return 0
   fi
   return 1
 }
@@ -244,7 +248,7 @@ main() {
   MCP_CONFIG_FILE=$(scan_config) || MCP_CONFIG_FILE=""
   if [ -n "$MCP_CONFIG_FILE" ]; then MCP_CONFIGURED=yes; else MCP_CONFIGURED=no; MCP_CONFIG_FILE=none; fi
 
-  if chrome_running "$PLATFORM"; then CHROME_RUNNING=yes; else CHROME_RUNNING=no; fi
+  if chrome_running "$PLATFORM" "$CHROME_PATH"; then CHROME_RUNNING=yes; else CHROME_RUNNING=no; fi
   PORT_FILE_FOUND=no
   DEBUG_PORT=$(debug_port "$USER_DATA_DIR")
   if [ -n "$USER_DATA_DIR" ] && [ -f "$USER_DATA_DIR/DevToolsActivePort" ]; then
