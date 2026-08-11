@@ -73,11 +73,26 @@ function Get-DebugPort([string]$udd) {
 }
 
 function Get-DebugReachable([string]$port) {
+  # Mirrors debug_reachable in preflight.sh: a non-200 response still means
+  # something answered — that is the chrome://inspect opt-in endpoint, which is
+  # WebSocket-only and serves 404 for every HTTP path.
+  $uri = "http://127.0.0.1:$port/json/version"
+  $skip = (Get-Command Invoke-WebRequest).Parameters.ContainsKey('SkipHttpErrorCheck')
   try {
-    $r = Invoke-WebRequest -Uri "http://127.0.0.1:$port/json/version" -TimeoutSec 2 -UseBasicParsing
+    if ($skip) {
+      $r = Invoke-WebRequest -Uri $uri -TimeoutSec 2 -UseBasicParsing -SkipHttpErrorCheck -ErrorAction Stop
+    } else {
+      $r = Invoke-WebRequest -Uri $uri -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
+    }
+    if (-not $r) { return 'no' }
     if ($r.StatusCode -eq 200) { return 'yes' }
+    return 'optin'
+  } catch {
+    # A response object means a status arrived (Windows PowerShell 5.1 path);
+    # its absence means a transport failure.
+    if ($_.Exception.Response) { return 'optin' }
     return 'no'
-  } catch { return 'no' }
+  }
 }
 
 function Get-ConfigFile {
@@ -136,6 +151,7 @@ $status =
   elseif (-not $cfg) { 'NOT_CONFIGURED' }
   elseif ($running -eq 'no') { 'CHROME_NOT_RUNNING' }
   elseif ($reach -eq 'yes') { 'READY' }
+  elseif ($reach -eq 'optin' -and $script:PortFileFound) { 'READY' }
   elseif ($reach -eq 'unknown' -and $script:PortFileFound) { 'READY' }
   else { 'NEEDS_OPT_IN' }
 "STATUS=$status"
