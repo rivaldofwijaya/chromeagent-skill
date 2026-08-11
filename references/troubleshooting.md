@@ -28,6 +28,8 @@ Update Chrome (Menu → Help → About Google Chrome), or use a fallback:
   `--user-data-dir`**, then configure `--browserUrl=http://127.0.0.1:9222`. No 144 opt-in needed, but
   it is not your normal profile unless you point it at one. Chrome refuses `--remote-debugging-port`
   against the default profile, which is why the separate dir is mandatory.
+  This is the launch mode that yields `DEBUG_REACHABLE=yes` and serves `/json/list`; the
+  `chrome://inspect` opt-in yields `DEBUG_REACHABLE=optin` and serves neither.
 - **`--isolated`**: the MCP server launches a throwaway profile. **You lose all cookies and logins.**
 
 ## `NOT_CONFIGURED`
@@ -76,6 +78,19 @@ you can revoke it from the same page. Nothing automates this; it is a deliberate
 If you already allowed it: fully quit Chrome (not just the window) and reopen it, then re-run
 preflight.
 
+The opt-in endpoint is **WebSocket-only**. It exposes exactly the browser endpoint named on line 2
+of `DevToolsActivePort` and answers `404` to every HTTP path, including `/json/version` and the rest
+of the `/json/*` family. A manual `curl http://127.0.0.1:9222/json/version` returning `404` is
+therefore **not** evidence of a broken setup — it is what a healthy opt-in looks like. The checks
+that do work:
+
+- `lsof -nP -iTCP:9222 -sTCP:LISTEN` — something is listening on the port.
+- `cat "$HOME/Library/Application Support/Google/Chrome/DevToolsActivePort"` — line 1 is the port,
+  line 2 is the `/devtools/browser/<uuid>` path. On Windows the file lives in
+  `%LOCALAPPDATA%\Google\Chrome\User Data\`.
+
+Preflight reports this state as `DEBUG_REACHABLE=optin`.
+
 ## `READY` but the MCP tools are absent from the session
 
 **Symptom:** Preflight reports `STATUS=READY`, but this agent session has no `chrome-devtools` tools.
@@ -89,6 +104,11 @@ server loads at agent startup.
 
 ### Other `READY` checks
 
+- `DEBUG_REACHABLE=optin` means something answered on the debug port with a non-200 status. That is
+  the normal value for a `chrome://inspect` opt-in, whose endpoint is WebSocket-only. It reports
+  `READY` only when Chrome's `DevToolsActivePort` file is also present, so the two together are the
+  evidence; the real connection remains the final test. `DEBUG_REACHABLE=yes` means the classic
+  `--remote-debugging-port` launch, which does serve `/json/version` over plain HTTP.
 - Preflight reports `DEBUG_REACHABLE=unknown` on machines with no `curl`, `wget`, or `node` to probe
   with. If a port file existed it still reports `READY` and lets the real connection be the test,
   so a failure here means the endpoint genuinely is not answering. Re-do the opt-in.
