@@ -190,6 +190,11 @@ write_claude() {
   args=$(args_json "$prefix")
   target="$OUT_DIR/.mcp.json"
 
+  if [ -L "$target" ]; then
+    printf 'setup-mcp: refusing to write through symlink %s\n' "$target" >&2
+    return 3
+  fi
+
   if [ ! -f "$target" ]; then
     claude_snippet "$cmd" "$args" > "$target"
     rc=$?
@@ -288,6 +293,11 @@ write_opencode() {
   cj=$(command_json)
   target="$OUT_DIR/opencode.json"
 
+  if [ -L "$target" ]; then
+    printf 'setup-mcp: refusing to write through symlink %s\n' "$target" >&2
+    return 3
+  fi
+
   if [ ! -f "$target" ]; then
     opencode_snippet "$cj" > "$target"
     rc=$?
@@ -337,9 +347,8 @@ write_codex() {
 # Prints the agents in play, space separated.
 detect_agents() {
   found=""
-  { [ -f "$OUT_DIR/.mcp.json" ] || [ -d "$OUT_DIR/.claude" ] || command -v claude >/dev/null 2>&1; } && found="$found claude"
-  { [ -f "$OUT_DIR/opencode.json" ] || command -v opencode >/dev/null 2>&1; } && found="$found opencode"
-  { [ -f "$HOME/.codex/config.toml" ] || command -v codex >/dev/null 2>&1; } && found="$found codex"
+  { [ -f "$OUT_DIR/.mcp.json" ] || [ -d "$OUT_DIR/.claude" ]; } && found="$found claude"
+  [ -f "$OUT_DIR/opencode.json" ] && found="$found opencode"
   [ -n "$found" ] || found=" claude"
   printf '%s\n' "${found# }"
 }
@@ -361,11 +370,13 @@ case "$AGENT" in
     write_codex || record_rc "$?"
     ;;
   auto)
+    if [ -f "$HOME/.codex/config.toml" ] || command -v codex >/dev/null 2>&1; then
+      printf 'setup-mcp: codex detected but not configured; run --agent codex to update your global Codex config.\n'
+    fi
     for a in $(detect_agents); do
       case "$a" in
         claude) write_claude || record_rc "$?" ;;
         opencode) write_opencode || record_rc "$?" ;;
-        codex) write_codex || record_rc "$?" ;;
       esac
     done
     ;;

@@ -161,6 +161,24 @@ else
   _fail "file target was changed"
 fi
 
+
+test_case "ps1 setup: refuses dangling symlink targets without creating pointed-at files"
+link_host_tool pwsh
+stub_cmd npx "exit 0"
+mkdir -p "$HOME/.codex"
+for agent in claude opencode; do
+  if [ "$agent" = claude ]; then target_name=.mcp.json; else target_name=opencode.json; fi
+  target="$SANDBOX/project/$target_name"
+  pointed_to="$HOME/.codex/config.toml"
+  ln -s "$pointed_to" "$target"
+  out=$(run_setup_ps1 -Agent "$agent")
+  rc=$?
+  if [ "$rc" -eq 3 ]; then _ok "exit 3"; else _fail "expected exit 3, got $rc"; fi
+  assert_contains "setup-mcp: refusing to write through symlink $target" "$out"
+  if [ -L "$target" ]; then _ok "$target remained a symlink"; else _fail "$target was replaced"; fi
+  if [ ! -e "$pointed_to" ]; then _ok "pointed-at file was not created"; else _fail "pointed-at file was created"; fi
+done
+
 test_case "ps1 setup: default output directory remains cwd"
 link_host_tool pwsh
 stub_cmd npx 'exit 0'
@@ -188,17 +206,120 @@ if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
 assert_contains "setup-mcp: merged chrome-devtools into $SANDBOX/project/.mcp.json" "$out"
 assert_not_contains 'merged chrome-devtools into ./' "$out"
 
-test_case "ps1 setup: auto probes and writes the resolved output directory"
+test_case "ps1 setup: auto probes and configures markers in the resolved output directory"
 link_host_tool pwsh
-stub_cmd npx 'exit 0'
+stub_cmd npx "exit 0"
 out_dir="$SANDBOX/target"
 mkdir "$out_dir"
-printf '%s\n' '{"mcpServers":{}}' > "$out_dir/.mcp.json"
+printf "%s\n" "{\"mcpServers\":{}}" > "$out_dir/.mcp.json"
+printf "%s\n" "{\"mcp\":{}}" > "$out_dir/opencode.json"
+# With the probe reverted from $resolvedOutDir to ., the deliberately empty
+# cwd would trigger the Claude fallback instead of configuring both markers.
 out=$(run_setup_ps1 -Agent auto -OutDir "$out_dir")
 rc=$?
 if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
-assert_contains 'chrome-devtools' "$(cat "$out_dir/.mcp.json")"
+assert_contains "chrome-devtools" "$(cat "$out_dir/.mcp.json")"
+assert_contains "chrome-devtools" "$(cat "$out_dir/opencode.json")"
 if [ ! -e "$SANDBOX/project/.mcp.json" ]; then _ok "cwd was not written"; else _fail "cwd was written"; fi
+if [ ! -e "$SANDBOX/project/opencode.json" ]; then _ok "cwd remained empty"; else _fail "cwd received a marker target"; fi
+
+test_case "ps1 setup: auto does not invoke codex from PATH"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+stub_cmd codex 'printf "%s\n" invoked > "$HOME/auto-codex.log"'
+out=$(run_setup_ps1 -Agent auto)
+rc=$?
+if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
+if [ ! -e "$HOME/auto-codex.log" ]; then
+  _ok "codex stub was not invoked"
+else
+  _fail "codex stub was invoked"
+fi
+
+test_case "ps1 setup: auto does not modify the global codex config"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+mkdir -p "$HOME/.codex"
+printf '%s\n' 'existing = true' > "$HOME/.codex/config.toml"
+cp "$HOME/.codex/config.toml" "$SANDBOX/codex-config.before"
+out=$(run_setup_ps1 -Agent auto)
+rc=$?
+if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
+assert_contains "setup-mcp: codex detected but not configured; run -Agent codex to update your global Codex config." "$out"
+if link_host_tool cmp; then
+  if cmp -s "$SANDBOX/codex-config.before" "$HOME/.codex/config.toml"; then
+    _ok "global codex config is byte-identical"
+  else
+    _fail "global codex config was modified"
+  fi
+else
+  _fail "host cmp unavailable"
+fi
+
+test_case "ps1 setup: auto prints one codex notice for a PATH codex"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+stub_cmd codex 'exit 0'
+out=$(run_setup_ps1 -Agent auto)
+rc=$?
+if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
+codex_notice='setup-mcp: codex detected but not configured; run -Agent codex to update your global Codex config.'
+notice_count=$(printf '%s\n' "$out" | grep -F -x -c -- "$codex_notice")
+if [ "$notice_count" -eq 1 ]; then _ok "codex notice printed once"; else _fail "codex notice count was $notice_count"; fi
+
+test_case "ps1 setup: auto does not print a codex notice when codex is absent"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+out=$(run_setup_ps1 -Agent auto)
+rc=$?
+if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
+assert_not_contains 'setup-mcp: codex detected but not configured' "$out"
+
+test_case "ps1 setup: an opencode marker beats a PATH-only claude"
+link_host_tool pwsh
+stub_cmd npx "exit 0"
+stub_cmd claude "exit 0"
+# A reverted Get-Command claude arm would select both targets; marker-only
+# detection must select just the opencode marker.
+printf "%s\n" "{\"mcp\":{}}" > "$SANDBOX/project/opencode.json"
+out=$(run_setup_ps1 -Agent auto)
+rc=$?
+if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
+assert_contains "chrome-devtools" "$(cat "$SANDBOX/project/opencode.json")"
+if [ ! -e "$SANDBOX/project/.mcp.json" ]; then _ok "PATH-only claude was ignored"; else _fail "PATH-only claude was selected"; fi
+
+test_case "ps1 setup: a PATH-only opencode does not select opencode"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+stub_cmd opencode 'exit 0'
+out=$(run_setup_ps1 -Agent auto)
+rc=$?
+if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
+if [ -f "$SANDBOX/project/.mcp.json" ]; then _ok "fallback wrote .mcp.json"; else _fail "fallback did not write .mcp.json"; fi
+if [ ! -e "$SANDBOX/project/opencode.json" ]; then _ok "PATH-only opencode was ignored"; else _fail "PATH-only opencode was selected"; fi
+
+test_case "ps1 setup: an opencode marker configures opencode"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+printf '%s\n' '{"mcp":{}}' > "$SANDBOX/project/opencode.json"
+out=$(run_setup_ps1 -Agent auto)
+rc=$?
+if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
+assert_contains 'chrome-devtools' "$(cat "$SANDBOX/project/opencode.json")"
+if [ ! -e "$SANDBOX/project/.mcp.json" ]; then _ok "claude was not selected"; else _fail "claude was selected"; fi
+
+test_case "ps1 setup: a .claude marker beats a PATH-only opencode"
+link_host_tool pwsh
+stub_cmd npx "exit 0"
+stub_cmd opencode "exit 0"
+mkdir "$SANDBOX/project/.claude"
+# A reverted Get-Command opencode arm would select both targets; this marker
+# case must select claude without creating an OpenCode config.
+out=$(run_setup_ps1 -Agent auto)
+rc=$?
+if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
+if [ -f "$SANDBOX/project/.mcp.json" ]; then _ok ".claude marker selected claude"; else _fail ".claude marker did not select claude"; fi
+if [ ! -e "$SANDBOX/project/opencode.json" ]; then _ok "opencode was not selected"; else _fail "opencode was selected"; fi
 
 test_case "ps1 setup: -OutDir is ignored for codex"
 link_host_tool pwsh

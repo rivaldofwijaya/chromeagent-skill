@@ -343,6 +343,12 @@ function Write-JsonFile([string]$Path, $Document) {
 # its exit 3 remains defined for other merge failures, not this branch.
 function Write-Claude {
   $target = Join-Path $resolvedOutDir '.mcp.json'
+  $targetItem = Get-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
+  if (($null -ne $targetItem) -and ($targetItem.LinkType -eq 'SymbolicLink')) {
+    Write-ErrorLine "setup-mcp: refusing to write through symlink $target"
+    Set-ExitCode 3
+    return
+  }
   $hadFile = Test-Path -LiteralPath $target -PathType Leaf
   try {
     $r = Get-RunnerParts
@@ -366,6 +372,12 @@ function Write-Claude {
 
 function Write-Opencode {
   $target = Join-Path $resolvedOutDir 'opencode.json'
+  $targetItem = Get-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
+  if (($null -ne $targetItem) -and ($targetItem.LinkType -eq 'SymbolicLink')) {
+    Write-ErrorLine "setup-mcp: refusing to write through symlink $target"
+    Set-ExitCode 3
+    return
+  }
   $hadFile = Test-Path -LiteralPath $target -PathType Leaf
   try {
     $r = Get-RunnerParts
@@ -421,25 +433,28 @@ function Get-DetectedAgents {
   $claudeConfigPath = Join-Path $resolvedOutDir '.mcp.json'
   $claudeMarkerPath = Join-Path $resolvedOutDir '.claude'
   if ((Test-Path -LiteralPath $claudeConfigPath -PathType Leaf) -or
-      (Test-Path -LiteralPath $claudeMarkerPath -PathType Container) -or
-      (Get-Command claude -ErrorAction SilentlyContinue)) {
+      (Test-Path -LiteralPath $claudeMarkerPath -PathType Container)) {
     $found += 'claude'
   }
   $opencodeConfigPath = Join-Path $resolvedOutDir 'opencode.json'
-  if ((Test-Path -LiteralPath $opencodeConfigPath -PathType Leaf) -or
-      (Get-Command opencode -ErrorAction SilentlyContinue)) {
+  if (Test-Path -LiteralPath $opencodeConfigPath -PathType Leaf) {
     $found += 'opencode'
-  }
-  if ((Test-Path -LiteralPath (Join-Path $HOME '.codex/config.toml') -PathType Leaf) -or
-      (Get-Command codex -ErrorAction SilentlyContinue)) {
-    $found += 'codex'
   }
   if (-not $found) { $found = @('claude') }
   return @($found)
 }
 
+function Test-CodexPresent {
+  $codexConfigPath = Join-Path (Join-Path $HOME '.codex') 'config.toml'
+  $codexCommand = Get-Command codex -ErrorAction SilentlyContinue
+  return ((Test-Path -LiteralPath $codexConfigPath -PathType Leaf) -or ($null -ne $codexCommand))
+}
+
 try {
   $targets = if ($Agent -eq 'auto') { Get-DetectedAgents } else { @($Agent) }
+  if (($Agent -eq 'auto') -and (Test-CodexPresent)) {
+    Write-Info 'setup-mcp: codex detected but not configured; run -Agent codex to update your global Codex config.'
+  }
   foreach ($target in $targets) {
     switch ($target) {
       'claude'   { Write-Claude }
