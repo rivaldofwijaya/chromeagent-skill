@@ -22,6 +22,8 @@ nothing has changed.
 
 ## 2. Preflight
 
+Both setup scripts resolve paths relative to the current working directory, so run them from the project root; the skill's own directory is never the right place. Invoke the scripts by their absolute path from the project-root shell. If the working directory cannot be the project root, use `--out-dir <dir>` (or `-OutDir <dir>`) as the explicit output override. Preflight scans config paths relative to its own current working directory and has no `--out-dir`/`-OutDir` override. If setup writes elsewhere, run preflight from that output directory; otherwise it reports `NOT_CONFIGURED` even though the config exists.
+
 ```bash
 sh scripts/preflight.sh          # macOS, Linux, Git Bash / WSL
 ```
@@ -47,7 +49,7 @@ Read the `STATUS` and branch. Verdict precedence is first failing check wins: `N
 | STATUS | Do this |
 |---|---|
 | `READY` | If the `chrome-devtools` tools are present, say nothing: `list_pages` → `select_page` → the user's task. If the tools are absent, do not call `list_pages` yet: the config may have just been written, so reload/restart the MCP connection, wait for the tools to appear, then continue. |
-| `NOT_CONFIGURED` | Run `sh scripts/setup-mcp.sh --agent auto` on POSIX or `pwsh -File scripts/setup-mcp.ps1 -Agent auto` on native Windows without asking. On successful setup the config was just written; reload/restart the MCP connection before calling any tool, because MCP config is read at startup. |
+| `NOT_CONFIGURED` | Run `sh scripts/setup-mcp.sh --agent auto` on POSIX or `pwsh -File scripts/setup-mcp.ps1 -Agent auto` on native Windows without asking. The command writes into the current working directory, which must be the project root unless an explicit output directory is supplied. On successful setup the config was just written; reload/restart the MCP connection before calling any tool, because MCP config is read at startup. |
 | `NEEDS_OPT_IN` | Stop. One instruction: "Open `chrome://inspect/#remote-debugging` in Chrome and click Allow." Then re-run preflight. |
 | `CHROME_NOT_RUNNING` | Ask the user to open Chrome normally, then re-run preflight. |
 | `CHROME_TOO_OLD` | Report the actual `CHROME_VERSION` found and that `--autoConnect` needs Chrome 144+. Offer the fallbacks below as an explicit choice. |
@@ -64,10 +66,22 @@ profile in a different directory and `--autoConnect` must be told which one. Omi
 `stable`.
 
 The POSIX setup CLI accepts agents `auto|claude|codex|opencode`, plus `--runner "<argv>"`,
-`--channel beta|dev|canary`, and `--no-redact`. The native PowerShell spelling is `-Agent`, `-Runner`, `-Channel`, and `-NoRedact`; it accepts the same three channel values. On native Windows, use
+`--channel beta|dev|canary`, `--out-dir <dir>`, and `--no-redact`. The native PowerShell spelling is `-Agent`, `-Runner`, `-Channel`, and `-NoRedact`; add `-OutDir <dir>` for the output-directory override. It accepts the same three channel values. On native Windows, use
 `pwsh -File scripts/setup-mcp.ps1 -Agent auto` for the setup branch above. Both setup CLIs use exit 0
 for success and exit 2 for bad usage or invalid agent/channel values. Exit 3 is a setup failure on
 either platform, not a preflight verdict and not synonymous with manual merge.
+
+The help output is:
+
+`usage: setup-mcp.sh --agent auto|claude|codex|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact]`
+
+`usage: setup-mcp.ps1 -Agent auto|claude|codex|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact]`
+
+`auto` configures project-scoped agents only (Claude Code and OpenCode); Codex requires an explicit `--agent codex` and writes the user's global `~/.codex/config.toml`.
+
+For `auto`, markers in the resolved output directory select the project target: `.mcp.json` or `.claude/` selects Claude Code, and `opencode.json` selects OpenCode. With no marker, `auto` falls back to Claude Code. It never writes Codex's global config. When Codex is present, POSIX prints `setup-mcp: codex detected but not configured; run --agent codex to update your global Codex config.` and PowerShell prints `setup-mcp: codex detected but not configured; run -Agent codex to update your global Codex config.`
+
+A successful setup prints the absolute path it wrote; check that path against the project root. `--out-dir` and `-OutDir` require an existing directory; neither script creates it.
 
 The setup defaults are exactly `--autoConnect`, `--redactNetworkHeaders`, in that order;
 `--no-redact` (or `-NoRedact`) drops the redaction flag, and a channel flag follows those defaults.

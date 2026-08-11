@@ -39,6 +39,14 @@ On native Windows, use `pwsh -File scripts/setup-mcp.ps1 -Agent auto` instead.
 Scanned, in order: `./.mcp.json`, `./.vscode/mcp.json`, `./.cursor/mcp.json`, `./opencode.json`,
 `./.codex/config.toml`, `~/.codex/config.toml`, `~/.config/opencode/opencode.json`.
 
+## Config was written to the wrong directory
+
+**Symptom:** Setup reports success but preflight still says `NOT_CONFIGURED`, or the agent never gains the tools.
+
+**Cause:** Both setup scripts resolve paths against the working directory, and a shell that was `cd`'d elsewhere — for example into the skill's own directory — silently retargets the write. Preflight also scans config paths relative to its own working directory, so it will not find a config written by `--out-dir`/`-OutDir` when run from a different directory.
+
+**Fix:** Check the absolute path in setup's output, move or delete the stray file, then re-run setup from the project root or pass `--out-dir` (or `-OutDir`). If you use an output-directory override, run preflight from that same directory. `auto` does not configure Codex; use the explicit `--agent codex` (or `-Agent codex`) for the user's global Codex config.
+
 ## Existing config could not be merged
 
 Symptom: setup reports that an existing file is invalid, cannot be written, or is already present

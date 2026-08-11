@@ -82,6 +82,34 @@ skill_assert_fixed 'Invalid JSON during a Node merge and Codex' "$body"
 skill_assert_fixed 'invalid existing JSON and Codex registration failures can also exit 3' "$body"
 skill_assert_fixed 'does not use the sh manual-merge branch' "$body"
 
+test_case "docs: documents the cwd contract, output directory, and auto scope"
+skill=$(cat "$REPO_ROOT/SKILL.md")
+readme=$(cat "$REPO_ROOT/README.md")
+cwd_sentence="Both setup scripts resolve paths relative to the current working directory, so run them from the project root; the skill's own directory is never the right place."
+auto_sentence='`auto` configures project-scoped agents only (Claude Code and OpenCode); Codex requires an explicit `--agent codex` and writes the user'\''s global `~/.codex/config.toml`.'
+skill_assert_fixed "$cwd_sentence" "$skill"
+skill_assert_fixed 'Invoke the scripts by their absolute path from the project-root shell.' "$skill"
+skill_assert_fixed 'use `--out-dir <dir>` (or `-OutDir <dir>`) as the explicit output override' "$skill"
+skill_assert_fixed "$auto_sentence" "$skill"
+skill_assert_fixed 'A successful setup prints the absolute path it wrote; check that path against the project root.' "$skill"
+skill_assert_fixed 'usage: setup-mcp.sh --agent auto|claude|codex|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact]' "$skill"
+skill_assert_fixed 'usage: setup-mcp.ps1 -Agent auto|claude|codex|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact]' "$skill"
+skill_assert_fixed "$cwd_sentence" "$readme"
+skill_assert_fixed 'Invoke the scripts by their absolute path from the project-root shell.' "$readme"
+skill_assert_fixed 'Flags: `--runner "<argv>"`, `--channel beta|dev|canary`, `--out-dir "<dir>"`, `--no-redact`' "$readme"
+skill_assert_fixed 'PowerShell: `-Runner "<argv>"`, `-Channel beta|dev|canary`, `-OutDir "<dir>"`, and `-NoRedact`' "$readme"
+skill_assert_fixed "$auto_sentence" "$readme"
+skill_assert_fixed 'usage: setup-mcp.sh --agent auto|claude|codex|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact]' "$readme"
+skill_assert_fixed 'usage: setup-mcp.ps1 -Agent auto|claude|codex|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact]' "$readme"
+skill_assert_fixed 'setup-mcp: codex detected but not configured; run --agent codex to update your global Codex config.' "$skill"
+skill_assert_fixed 'setup-mcp: codex detected but not configured; run -Agent codex to update your global Codex config.' "$skill"
+skill_assert_fixed 'setup-mcp: codex detected but not configured; run --agent codex to update your global Codex config.' "$readme"
+skill_assert_fixed 'setup-mcp: codex detected but not configured; run -Agent codex to update your global Codex config.' "$readme"
+
+test_case "docs: troubleshooting covers a wrong-directory setup"
+body=$(cat "$REPO_ROOT/references/troubleshooting.md")
+skill_assert_fixed '## Config was written to the wrong directory' "$body"
+
 test_case "SKILL.md: names both script flavours and the confirm-first policy"
 skill="$REPO_ROOT/SKILL.md"
 body=$(cat "$skill")
