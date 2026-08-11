@@ -179,6 +179,24 @@ for agent in claude opencode; do
   if [ ! -e "$pointed_to" ]; then _ok "pointed-at file was not created"; else _fail "pointed-at file was created"; fi
 done
 
+test_case "ps1 setup: directory-shaped targets fail without writing inside them"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+for agent in claude opencode; do
+  if [ "$agent" = claude ]; then target_name=.mcp.json; else target_name=opencode.json; fi
+  target="$SANDBOX/project/$target_name"
+  mkdir "$target"
+  out=$(run_setup_ps1 -Agent "$agent")
+  rc=$?
+  if [ "$rc" -eq 3 ]; then _ok "exit 3"; else _fail "expected exit 3, got $rc"; fi
+  assert_contains "setup-mcp: failed to write $target" "$out"
+  if [ -d "$target" ] && [ -z "$(ls -A "$target")" ]; then
+    _ok "$target remained an empty directory"
+  else
+    _fail "$target was changed or received a temp file"
+  fi
+done
+
 test_case "ps1 setup: default output directory remains cwd"
 link_host_tool pwsh
 stub_cmd npx 'exit 0'
@@ -514,6 +532,7 @@ out=$(run_setup_ps1_with_move_failure claude)
 rc=$?
 after=$(cat "$SANDBOX/project/.mcp.json")
 if [ "$rc" -eq 3 ]; then _ok "rename failure exits 3"; else _fail "expected rename failure exit 3, got $rc"; fi
+assert_contains "setup-mcp: failed to write $SANDBOX/project/.mcp.json" "$out"
 if [ "$before" = "$after" ]; then _ok "original file survived rename failure"; else _fail "original file was modified"; fi
 temp_left=no
 for temp in "$SANDBOX/project"/..mcp.json.tmp-*; do
@@ -527,10 +546,12 @@ stub_cmd npx 'exit 0'
 out=$(run_setup_ps1_with_move_failure claude)
 rc=$?
 if [ "$rc" -eq 3 ]; then _ok "claude create failure exits 3"; else _fail "expected claude create failure exit 3, got $rc"; fi
+assert_contains "setup-mcp: failed to write $SANDBOX/project/.mcp.json" "$out"
 if [ ! -e "$SANDBOX/project/.mcp.json" ]; then _ok "claude target was not created"; else _fail "claude target was created"; fi
 out=$(run_setup_ps1_with_move_failure opencode)
 rc=$?
 if [ "$rc" -eq 3 ]; then _ok "opencode create failure exits 3"; else _fail "expected opencode create failure exit 3, got $rc"; fi
+assert_contains "setup-mcp: failed to write $SANDBOX/project/opencode.json" "$out"
 if [ ! -e "$SANDBOX/project/opencode.json" ]; then _ok "opencode target was not created"; else _fail "opencode target was created"; fi
 
 test_case "ps1 setup: malformed JSON root shapes fail without clobbering"

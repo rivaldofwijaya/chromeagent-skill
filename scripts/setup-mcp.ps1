@@ -349,6 +349,11 @@ function Write-Claude {
     Set-ExitCode 3
     return
   }
+  if (Test-Path -LiteralPath $target -PathType Container) {
+    Write-ErrorLine "setup-mcp: failed to write $target"
+    Set-ExitCode 3
+    return
+  }
   $hadFile = Test-Path -LiteralPath $target -PathType Leaf
   try {
     $r = Get-RunnerParts
@@ -362,12 +367,19 @@ function Write-Claude {
       command = $r.Command
       args    = @($r.Args) + @(Get-ServerArgs)
     }
-    Write-JsonFile $target $doc
-    Write-Info "setup-mcp: $(if ($hadFile) { 'merged chrome-devtools into' } else { 'wrote' }) $target"
   } catch {
     Write-ErrorLine $_.Exception.Message
     Set-ExitCode 3
+    return
   }
+  try {
+    Write-JsonFile $target $doc
+  } catch {
+    Write-ErrorLine "setup-mcp: failed to write $target"
+    Set-ExitCode 3
+    return
+  }
+  Write-Info "setup-mcp: $(if ($hadFile) { 'merged chrome-devtools into' } else { 'wrote' }) $target"
 }
 
 function Write-Opencode {
@@ -375,6 +387,11 @@ function Write-Opencode {
   $targetItem = Get-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
   if (($null -ne $targetItem) -and ($targetItem.LinkType -eq 'SymbolicLink')) {
     Write-ErrorLine "setup-mcp: refusing to write through symlink $target"
+    Set-ExitCode 3
+    return
+  }
+  if (Test-Path -LiteralPath $target -PathType Container) {
+    Write-ErrorLine "setup-mcp: failed to write $target"
     Set-ExitCode 3
     return
   }
@@ -393,12 +410,19 @@ function Write-Opencode {
       enabled = $true
       command = @($r.Command) + @($r.Args) + @(Get-ServerArgs)
     }
-    Write-JsonFile $target $doc
-    Write-Info "setup-mcp: $(if ($hadFile) { 'merged chrome-devtools into' } else { 'wrote' }) $target"
   } catch {
     Write-ErrorLine $_.Exception.Message
     Set-ExitCode 3
+    return
   }
+  try {
+    Write-JsonFile $target $doc
+  } catch {
+    Write-ErrorLine "setup-mcp: failed to write $target"
+    Set-ExitCode 3
+    return
+  }
+  Write-Info "setup-mcp: $(if ($hadFile) { 'merged chrome-devtools into' } else { 'wrote' }) $target"
 }
 
 function Write-Codex {

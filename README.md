@@ -20,16 +20,18 @@ cookies, logins, and tabs you already have open, through the
 git clone https://github.com/rivaldofwijaya/chromeagent-skill.git
 ```
 
-Copy the directory into your agent's skills location, then run setup from your project root:
+Copy the directory into your agent's skills location, then replace the placeholder paths below and run setup from your project root:
 
 ```bash
-sh scripts/setup-mcp.sh --agent auto
+cd /path/to/your/project
+sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto
 ```
 
 On native Windows, use the PowerShell setup script:
 
 ```powershell
-pwsh -File scripts/setup-mcp.ps1 -Agent auto
+Set-Location /path/to/your/project
+pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto
 ```
 
 Restart your agent afterwards. MCP config is read at startup.
@@ -136,8 +138,9 @@ PowerShell: `-Runner "<argv>"`, `-Channel beta|dev|canary`, `-OutDir "<dir>"`, a
 ## Check your setup
 
 ```bash
-sh scripts/preflight.sh      # macOS, Linux, Git Bash / WSL
-pwsh -File scripts/preflight.ps1
+cd /path/to/your/project
+sh /path/to/chromeagent-skill/scripts/preflight.sh      # macOS, Linux, Git Bash / WSL
+pwsh -File /path/to/chromeagent-skill/scripts/preflight.ps1
 ```
 
 It prints `KEY=value` lines ending in one `STATUS=`. `STATUS=READY` validates local conditions only:

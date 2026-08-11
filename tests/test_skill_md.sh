@@ -29,7 +29,7 @@ test_case "SKILL.md: puts the fast path section before the preflight script"
 skill="$REPO_ROOT/SKILL.md"
 fast_heading=$(grep -n '^## 1\. Fast path' "$skill" | head -1 | cut -d: -f1)
 pre_heading=$(grep -n '^## 2\. Preflight$' "$skill" | head -1 | cut -d: -f1)
-preflight_command=$(grep -n '^sh scripts/preflight\.sh' "$skill" | head -1 | cut -d: -f1)
+preflight_command=$(grep -n '^sh /path/to/chromeagent-skill/scripts/preflight\.sh' "$skill" | head -1 | cut -d: -f1)
 if [ -n "$fast_heading" ] && [ -n "$pre_heading" ] && [ -n "$preflight_command" ] &&
    [ "$fast_heading" -lt "$pre_heading" ] && [ "$pre_heading" -lt "$preflight_command" ]; then
   _ok "fast path section and list_pages path precede preflight command"
@@ -183,8 +183,8 @@ for expected in \
   '"servers": {' \
   '`type: "stdio"` is optional because' \
   '"args": ["-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders"]' \
-  'sh scripts/setup-mcp.sh --agent auto' \
-  'pwsh -File scripts/setup-mcp.ps1 -Agent auto' \
+  'sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto' \
+  'pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto' \
   'Flags: `--runner "<argv>"`' \
   '`--channel beta|dev|canary`' \
   '`--no-redact`' \

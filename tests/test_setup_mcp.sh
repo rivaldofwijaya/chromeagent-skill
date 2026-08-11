@@ -81,6 +81,24 @@ for agent in claude opencode; do
   if [ ! -e "$pointed_to" ]; then _ok "pointed-at file was not created"; else _fail "pointed-at file was created"; fi
 done
 
+test_case "setup: directory-shaped targets fail without writing inside them"
+stub_cmd uname 'echo Darwin'
+stub_cmd npx 'exit 0'
+for agent in claude opencode; do
+  if [ "$agent" = claude ]; then target_name=.mcp.json; else target_name=opencode.json; fi
+  target="$SANDBOX/project/$target_name"
+  mkdir "$target"
+  out=$(run_setup --agent "$agent")
+  rc=$?
+  assert_setup_rc 3 "$rc"
+  assert_contains "setup-mcp: failed to write $target" "$out"
+  if [ -d "$target" ] && [ -z "$(ls -A "$target")" ]; then
+    _ok "$target remained an empty directory"
+  else
+    _fail "$target was changed or received a temp file"
+  fi
+done
+
 test_case "setup claude: default output directory remains cwd"
 stub_cmd uname 'echo Darwin'
 stub_cmd npx 'exit 0'
@@ -206,6 +224,7 @@ out=$(run_setup --agent claude)
 rc=$?
 chmod 700 "$SANDBOX/project"
 assert_setup_rc 3 "$rc"
+assert_contains "setup-mcp: failed to write $SANDBOX/project/.mcp.json" "$out"
 assert_not_contains "wrote $SANDBOX/project/.mcp.json" "$out"
 
 test_case "setup claude: an existing file is merged, not clobbered"
@@ -285,6 +304,7 @@ out=$(run_setup --agent opencode)
 rc=$?
 chmod 700 "$SANDBOX/project"
 assert_setup_rc 3 "$rc"
+assert_contains "setup-mcp: failed to write $SANDBOX/project/opencode.json" "$out"
 assert_not_contains "wrote $SANDBOX/project/opencode.json" "$out"
 
 test_case "setup opencode: merges into an existing opencode.json under the mcp key"

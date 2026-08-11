@@ -24,11 +24,15 @@ nothing has changed.
 
 Both setup scripts resolve paths relative to the current working directory, so run them from the project root; the skill's own directory is never the right place. Invoke the scripts by their absolute path from the project-root shell. If the working directory cannot be the project root, use `--out-dir <dir>` (or `-OutDir <dir>`) as the explicit output override. Preflight scans config paths relative to its own current working directory and has no `--out-dir`/`-OutDir` override. If setup writes elsewhere, run preflight from that output directory; otherwise it reports `NOT_CONFIGURED` even though the config exists.
 
+Replace the placeholder paths below with your project root and the installed skill directory.
+
 ```bash
-sh scripts/preflight.sh          # macOS, Linux, Git Bash / WSL
+cd /path/to/your/project
+sh /path/to/chromeagent-skill/scripts/preflight.sh  # macOS, Linux, Git Bash / WSL
 ```
 ```powershell
-pwsh -File scripts/preflight.ps1  # native Windows
+Set-Location /path/to/your/project
+pwsh -File /path/to/chromeagent-skill/scripts/preflight.ps1  # native Windows
 ```
 
 Both print `KEY=value` lines ending in exactly one `STATUS=`. Preflight reports local runner, Chrome,
