@@ -1,0 +1,298 @@
+#!/bin/sh
+# preflight.sh — chromeagent-skill status probe.
+# Prints KEY=value lines and exactly one STATUS= verdict. Always exits 0.
+#
+# Test-only overrides:
+#   CHROMEAGENT_ROOT      prefix prepended to absolute system paths
+#   CHROMEAGENT_PLATFORM  force macos|linux|windows
+#   CHROMEAGENT_LIB=1     define functions only, skip main
+set -u
+
+CHROME_MIN_MAJOR=144
+ROOT="${CHROMEAGENT_ROOT:-}"
+
+detect_platform() {
+  if [ -n "${CHROMEAGENT_PLATFORM:-}" ]; then
+    printf '%s\n' "$CHROMEAGENT_PLATFORM"
+    return
+  fi
+  case "$(uname -s 2>/dev/null || echo unknown)" in
+    Darwin) printf 'macos\n' ;;
+    Linux) printf 'linux\n' ;;
+    CYGWIN*|MINGW*|MSYS*|Windows_NT) printf 'windows\n' ;;
+    *) printf 'linux\n' ;;
+  esac
+}
+
+# Prints "RUNNER|RUNNER_CMD".
+detect_runner() {
+  if command -v npx >/dev/null 2>&1; then printf 'npx|npx -y\n'
+  elif command -v bunx >/dev/null 2>&1; then printf 'bunx|bunx\n'
+  elif command -v pnpm >/dev/null 2>&1; then printf 'pnpm-dlx|pnpm dlx\n'
+  elif command -v chrome-devtools-mcp >/dev/null 2>&1; then printf 'global|chrome-devtools-mcp\n'
+  else printf 'none|\n'
+  fi
+}
+
+# Emits "channel|binary|user_data_dir" lines, most-preferred first.
+# Binaries may be bare names (resolved on PATH) or absolute paths (ROOT-prefixed).
+chrome_candidates() {
+  case "$1" in
+    macos)
+      for channel in stable beta dev canary chromium; do
+        for base in "$ROOT/Applications" "$HOME/Applications"; do
+          case "$channel" in
+            stable)
+              printf 'stable|%s/Google Chrome.app/Contents/MacOS/Google Chrome|%s\n' \
+                "$base" "$HOME/Library/Application Support/Google/Chrome"
+              ;;
+            beta)
+              printf 'beta|%s/Google Chrome Beta.app/Contents/MacOS/Google Chrome Beta|%s\n' \
+                "$base" "$HOME/Library/Application Support/Google/Chrome Beta"
+              ;;
+            dev)
+              printf 'dev|%s/Google Chrome Dev.app/Contents/MacOS/Google Chrome Dev|%s\n' \
+                "$base" "$HOME/Library/Application Support/Google/Chrome Dev"
+              ;;
+            canary)
+              printf 'canary|%s/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary|%s\n' \
+                "$base" "$HOME/Library/Application Support/Google/Chrome Canary"
+              ;;
+            chromium)
+              printf 'chromium|%s/Chromium.app/Contents/MacOS/Chromium|%s\n' \
+                "$base" "$HOME/Library/Application Support/Chromium"
+              ;;
+          esac
+        done
+      done
+      ;;
+    linux)
+      printf 'stable|google-chrome-stable|%s/.config/google-chrome\n' "$HOME"
+      printf 'stable|google-chrome|%s/.config/google-chrome\n' "$HOME"
+      printf 'stable|%s/opt/google/chrome/chrome|%s/.config/google-chrome\n' "$ROOT" "$HOME"
+      printf 'beta|google-chrome-beta|%s/.config/google-chrome-beta\n' "$HOME"
+      printf 'dev|google-chrome-unstable|%s/.config/google-chrome-unstable\n' "$HOME"
+      printf 'chromium|%s/snap/bin/chromium|%s/snap/chromium/common/chromium\n' "$ROOT" "$HOME"
+      printf 'chromium|chromium|%s/.config/chromium\n' "$HOME"
+      printf 'chromium|chromium-browser|%s/.config/chromium\n' "$HOME"
+      printf 'chromium|%s/var/lib/flatpak/exports/bin/org.chromium.Chromium|%s/.var/app/org.chromium.Chromium/config/chromium\n' "$ROOT" "$HOME"
+      ;;
+    windows)
+      pf="${ProgramFiles:-C:/Program Files}"
+      pf86="${ProgramFiles_x86:-$(env | sed -n 's/^ProgramFiles(x86)=//p')}"
+      [ -n "$pf86" ] || pf86='C:/Program Files (x86)'
+      lad="${LOCALAPPDATA:-$HOME/AppData/Local}"
+      for channel in stable beta dev canary; do
+        for base in "$ROOT$pf" "$ROOT$pf86" "$ROOT$lad"; do
+          case "$channel" in
+            stable)
+              printf 'stable|%s/Google/Chrome/Application/chrome.exe|%s/Google/Chrome/User Data\n' "$base" "$lad"
+              ;;
+            beta)
+              printf 'beta|%s/Google/Chrome Beta/Application/chrome.exe|%s/Google/Chrome Beta/User Data\n' "$base" "$lad"
+              ;;
+            dev)
+              printf 'dev|%s/Google/Chrome Dev/Application/chrome.exe|%s/Google/Chrome Dev/User Data\n' "$base" "$lad"
+              ;;
+            canary)
+              printf 'canary|%s/Google/Chrome SxS/Application/chrome.exe|%s/Google/Chrome SxS/User Data\n' "$base" "$lad"
+              ;;
+          esac
+        done
+      done
+      ;;
+  esac
+}
+
+# major_of VERSION -> integer or 0
+major_of() {
+  m=$(printf '%s\n' "$1" | sed -n 's/^\([0-9][0-9]*\)\..*/\1/p')
+  [ -n "$m" ] || m=0
+  printf '%s\n' "$m"
+}
+
+# chrome_version BINARY PLATFORM -> full version or "unknown"
+chrome_version() {
+  raw=""
+  if [ "$2" = windows ]; then
+    # The Windows binary does not print --version; ask Windows for the file version.
+    if command -v powershell.exe >/dev/null 2>&1; then
+      raw=$(powershell.exe -NoProfile -Command \
+        "(Get-Item '$1').VersionInfo.ProductVersion" 2>/dev/null | tr -d '\r')
+    fi
+  else
+    raw=$("$1" --version 2>/dev/null)
+  fi
+  v=$(printf '%s\n' "$raw" | tr ' ' '\n' | grep -m1 '^[0-9][0-9]*\.[0-9]' )
+  [ -n "$v" ] || v=unknown
+  printf '%s\n' "$v"
+}
+
+# Prints the first found candidate; prints nothing when no candidate is found.
+find_chrome() {
+  CHROME_PATH=none
+  CHROME_CHANNEL=none
+  USER_DATA_DIR=""
+  chrome_candidates "$1" | while IFS='|' read -r ch bin udd; do
+    [ -n "$bin" ] || continue
+    case "$bin" in
+      /*|?:*) [ -x "$bin" ] || continue; resolved=$bin ;;
+      *) resolved=$(command -v "$bin" 2>/dev/null) || continue ;;
+    esac
+    printf '%s|%s|%s\n' "$ch" "$resolved" "$udd"
+    break
+  done
+}
+
+# Prints the path of the first config that configures chrome-devtools with
+# --autoConnect. Prints nothing when none does.
+scan_config() {
+  for f in \
+    "./.mcp.json" \
+    "./.vscode/mcp.json" \
+    "./.cursor/mcp.json" \
+    "./opencode.json" \
+    "./.codex/config.toml" \
+    "$HOME/.codex/config.toml" \
+    "$HOME/.config/opencode/opencode.json"
+  do
+    [ -f "$f" ] || continue
+    grep -q 'chrome-devtools' "$f" 2>/dev/null || continue
+    grep -q 'autoConnect' "$f" 2>/dev/null || continue
+    printf '%s\n' "$f"
+    return 0
+  done
+  return 1
+}
+
+# Exit 0 when a Chrome/Chromium process appears to be running.
+chrome_running() {
+  if [ "$1" = windows ]; then
+    if command -v tasklist >/dev/null 2>&1; then
+      tasklist 2>/dev/null | grep -qi 'chrome.exe' && return 0
+    fi
+    return 1
+  fi
+  if command -v pgrep >/dev/null 2>&1; then
+    pgrep -f '[Cc]hrom' >/dev/null 2>&1 && return 0
+    return 1
+  fi
+  if command -v ps >/dev/null 2>&1; then
+    ps ax 2>/dev/null | grep -v grep | grep -qi 'chrom' && return 0
+  fi
+  return 1
+}
+
+# debug_port USER_DATA_DIR -> port. Sets PORT_FILE_FOUND to yes|no.
+debug_port() {
+  PORT_FILE_FOUND=no
+  f="$1/DevToolsActivePort"
+  if [ -n "$1" ] && [ -f "$f" ]; then
+    p=$(sed -n '1p' "$f" 2>/dev/null | tr -d '\r')
+    case "$p" in
+      ''|*[!0-9]*) : ;;
+      *) PORT_FILE_FOUND=yes; printf '%s\n' "$p"; return 0 ;;
+    esac
+  fi
+  printf '9222\n'
+}
+
+# debug_reachable PORT -> yes|no|unknown
+debug_reachable() {
+  url="http://127.0.0.1:$1/json/version"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsS -m 2 "$url" >/dev/null 2>&1 && { printf 'yes\n'; return; }
+    printf 'no\n'; return
+  fi
+  if command -v wget >/dev/null 2>&1; then
+    wget -q -T 2 -O - "$url" >/dev/null 2>&1 && { printf 'yes\n'; return; }
+    printf 'no\n'; return
+  fi
+  if command -v node >/dev/null 2>&1; then
+    node -e "const t=setTimeout(()=>process.exit(1),2000);require('http').get('$url',r=>{clearTimeout(t);process.exit(r.statusCode===200?0:1)}).on('error',()=>{clearTimeout(t);process.exit(1)})" \
+      >/dev/null 2>&1 && { printf 'yes\n'; return; }
+    printf 'no\n'; return
+  fi
+  printf 'unknown\n'
+}
+
+main() {
+  PLATFORM=$(detect_platform)
+  runner=$(detect_runner)
+  RUNNER=${runner%%|*}
+  RUNNER_CMD=${runner#*|}
+  CHROME_CHANNEL=none
+  CHROME_PATH=none
+  USER_DATA_DIR=""
+  CHROME_VERSION=unknown
+  CHROME_MAJOR=0
+
+  if [ "$RUNNER" != none ]; then
+    hit=$(find_chrome "$PLATFORM" | sed -n '1p')
+    if [ -n "$hit" ]; then
+      CHROME_CHANNEL=${hit%%|*}
+      rest=${hit#*|}
+      CHROME_PATH=${rest%%|*}
+      USER_DATA_DIR=${rest#*|}
+      CHROME_VERSION=$(chrome_version "$CHROME_PATH" "$PLATFORM")
+      CHROME_MAJOR=$(major_of "$CHROME_VERSION")
+    fi
+  fi
+
+  if [ "$CHROME_MAJOR" -ge "$CHROME_MIN_MAJOR" ]; then CHROME_OK=yes; else CHROME_OK=no; fi
+
+  MCP_CONFIG_FILE=$(scan_config) || MCP_CONFIG_FILE=""
+  if [ -n "$MCP_CONFIG_FILE" ]; then MCP_CONFIGURED=yes; else MCP_CONFIGURED=no; MCP_CONFIG_FILE=none; fi
+
+  if chrome_running "$PLATFORM"; then CHROME_RUNNING=yes; else CHROME_RUNNING=no; fi
+  PORT_FILE_FOUND=no
+  DEBUG_PORT=$(debug_port "$USER_DATA_DIR")
+  if [ -n "$USER_DATA_DIR" ] && [ -f "$USER_DATA_DIR/DevToolsActivePort" ]; then
+    port_line=$(sed -n '1p' "$USER_DATA_DIR/DevToolsActivePort" 2>/dev/null | tr -d '\r')
+    case "$port_line" in
+      ''|*[!0-9]*) : ;;
+      *) PORT_FILE_FOUND=yes ;;
+    esac
+  fi
+  if [ "$CHROME_RUNNING" = yes ]; then
+    DEBUG_REACHABLE=$(debug_reachable "$DEBUG_PORT")
+  else
+    DEBUG_REACHABLE=no
+  fi
+
+  printf 'PLATFORM=%s\n' "$PLATFORM"
+  printf 'RUNNER=%s\n' "$RUNNER"
+  printf 'RUNNER_CMD=%s\n' "$RUNNER_CMD"
+  printf 'CHROME_PATH=%s\n' "$CHROME_PATH"
+  printf 'CHROME_CHANNEL=%s\n' "$CHROME_CHANNEL"
+  printf 'CHROME_VERSION=%s\n' "$CHROME_VERSION"
+  printf 'CHROME_MAJOR=%s\n' "$CHROME_MAJOR"
+  printf 'CHROME_OK=%s\n' "$CHROME_OK"
+  printf 'USER_DATA_DIR=%s\n' "$USER_DATA_DIR"
+  printf 'CHROME_RUNNING=%s\n' "$CHROME_RUNNING"
+  printf 'DEBUG_PORT=%s\n' "$DEBUG_PORT"
+  printf 'DEBUG_REACHABLE=%s\n' "$DEBUG_REACHABLE"
+  printf 'MCP_CONFIG_FILE=%s\n' "$MCP_CONFIG_FILE"
+  printf 'MCP_CONFIGURED=%s\n' "$MCP_CONFIGURED"
+
+  if [ "$RUNNER" = none ]; then
+    printf 'STATUS=NODE_MISSING\n'
+  elif [ "$CHROME_PATH" = none ]; then
+    printf 'STATUS=CHROME_MISSING\n'
+  elif [ "$CHROME_OK" = no ]; then
+    printf 'STATUS=CHROME_TOO_OLD\n'
+  elif [ "$MCP_CONFIGURED" = no ]; then
+    printf 'STATUS=NOT_CONFIGURED\n'
+  elif [ "$CHROME_RUNNING" = no ]; then
+    printf 'STATUS=CHROME_NOT_RUNNING\n'
+  elif [ "$DEBUG_REACHABLE" = yes ]; then
+    printf 'STATUS=READY\n'
+  elif [ "$DEBUG_REACHABLE" = unknown ] && [ "$PORT_FILE_FOUND" = yes ]; then
+    printf 'STATUS=READY\n'
+  else
+    printf 'STATUS=NEEDS_OPT_IN\n'
+  fi
+  return 0
+}
+
+[ "${CHROMEAGENT_LIB:-0}" = 1 ] || main
