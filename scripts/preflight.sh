@@ -201,21 +201,43 @@ debug_port() {
   printf '9222\n'
 }
 
-# debug_reachable PORT -> yes|no|unknown
+# debug_reachable PORT -> yes|optin|no|unknown
+# The question is "did anything answer", not "was the answer 200". Chrome's
+# chrome://inspect opt-in endpoint is WebSocket-only and serves 404 for every
+# HTTP path, including /json/version; a dead port answers nothing at all.
 debug_reachable() {
   url="http://127.0.0.1:$1/json/version"
   if command -v curl >/dev/null 2>&1; then
-    curl -fsS -m 2 "$url" >/dev/null 2>&1 && { printf 'yes\n'; return; }
-    printf 'no\n'; return
+    # %{http_code} is 000 when no response was received, so curl's exit
+    # status is not consulted.
+    code=$(curl -s -o /dev/null -w '%{http_code}' -m 2 "$url" 2>/dev/null)
+    case "$code" in
+      200) printf 'yes\n' ;;
+      ''|000|0|*[!0-9]*) printf 'no\n' ;;
+      *) printf 'optin\n' ;;
+    esac
+    return
   fi
   if command -v wget >/dev/null 2>&1; then
-    wget -q -T 2 -O - "$url" >/dev/null 2>&1 && { printf 'yes\n'; return; }
-    printf 'no\n'; return
+    wget -q -T 2 -O /dev/null "$url" >/dev/null 2>&1
+    rc=$?
+    case "$rc" in
+      0) printf 'yes\n' ;;
+      8) printf 'optin\n' ;;  # server issued an error response — a response nonetheless
+      *) printf 'no\n' ;;
+    esac
+    return
   fi
   if command -v node >/dev/null 2>&1; then
-    node -e "const t=setTimeout(()=>process.exit(1),2000);require('http').get('$url',r=>{clearTimeout(t);process.exit(r.statusCode===200?0:1)}).on('error',()=>{clearTimeout(t);process.exit(1)})" \
-      >/dev/null 2>&1 && { printf 'yes\n'; return; }
-    printf 'no\n'; return
+    node -e "const t=setTimeout(()=>process.exit(1),2000);require('http').get('$url',r=>{clearTimeout(t);r.resume();process.exit(r.statusCode===200?0:3)}).on('error',()=>{clearTimeout(t);process.exit(1)})" \
+      >/dev/null 2>&1
+    rc=$?
+    case "$rc" in
+      0) printf 'yes\n' ;;
+      3) printf 'optin\n' ;;
+      *) printf 'no\n' ;;
+    esac
+    return
   fi
   printf 'unknown\n'
 }
@@ -290,6 +312,8 @@ main() {
   elif [ "$CHROME_RUNNING" = no ]; then
     printf 'STATUS=CHROME_NOT_RUNNING\n'
   elif [ "$DEBUG_REACHABLE" = yes ]; then
+    printf 'STATUS=READY\n'
+  elif [ "$DEBUG_REACHABLE" = optin ] && [ "$PORT_FILE_FOUND" = yes ]; then
     printf 'STATUS=READY\n'
   elif [ "$DEBUG_REACHABLE" = unknown ] && [ "$PORT_FILE_FOUND" = yes ]; then
     printf 'STATUS=READY\n'
