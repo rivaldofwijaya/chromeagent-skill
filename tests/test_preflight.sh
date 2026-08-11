@@ -247,7 +247,7 @@ assert_status CHROME_NOT_RUNNING "$out"
 test_case "runtime: running chrome with no debug endpoint is NEEDS_OPT_IN"
 configured_chrome
 stub_cmd pgrep 'echo 4321'
-stub_cmd curl 'exit 7'
+stub_cmd curl 'printf 000; exit 7'
 out=$(run_preflight)
 assert_kv CHROME_RUNNING yes "$out"
 assert_kv DEBUG_REACHABLE no "$out"
@@ -258,7 +258,7 @@ configured_chrome
 mkdir -p "$(profile_dir)"
 printf '9333\n/devtools/browser/abc\n' > "$(profile_dir)/DevToolsActivePort"
 stub_cmd pgrep 'echo 4321'
-stub_cmd curl 'exit 0'
+stub_cmd curl 'printf 200'
 out=$(run_preflight)
 assert_kv DEBUG_PORT 9333 "$out"
 assert_kv DEBUG_REACHABLE yes "$out"
@@ -267,7 +267,7 @@ assert_status READY "$out"
 test_case "runtime: with no port file the probe falls back to 9222"
 configured_chrome
 stub_cmd pgrep 'echo 4321'
-stub_cmd curl 'exit 0'
+stub_cmd curl 'printf 200'
 out=$(run_preflight)
 assert_kv DEBUG_PORT 9222 "$out"
 assert_status READY "$out"
@@ -307,7 +307,7 @@ configured_chrome
 mkdir -p "$(profile_dir)"
 printf '9333\n' > "$(profile_dir)/DevToolsActivePort"
 stub_cmd pgrep 'echo 4321'
-stub_cmd curl 'exit 0'
+stub_cmd curl 'printf 200'
 out=$(run_preflight)
 for k in PLATFORM RUNNER RUNNER_CMD CHROME_PATH CHROME_CHANNEL CHROME_VERSION CHROME_MAJOR \
          CHROME_OK USER_DATA_DIR CHROME_RUNNING DEBUG_PORT DEBUG_REACHABLE MCP_CONFIG_FILE \
@@ -324,6 +324,90 @@ stub_cmd pgrep 'echo 4321'
 out=$(run_preflight)
 assert_kv DEBUG_PORT 9222 "$out"
 assert_kv DEBUG_REACHABLE unknown "$out"
+assert_status NEEDS_OPT_IN "$out"
+
+test_case "runtime: an opt-in websocket endpoint with a port file is READY"
+configured_chrome
+mkdir -p "$(profile_dir)"
+printf '9333\n/devtools/browser/abc\n' > "$(profile_dir)/DevToolsActivePort"
+stub_cmd pgrep 'echo 4321'
+stub_cmd curl 'printf 404; exit 22'
+out=$(run_preflight)
+assert_kv DEBUG_PORT 9333 "$out"
+assert_kv DEBUG_REACHABLE optin "$out"
+assert_status READY "$out"
+
+test_case "runtime: a non-200 answer with no port file is NEEDS_OPT_IN"
+configured_chrome
+stub_cmd pgrep 'echo 4321'
+stub_cmd curl 'printf 404; exit 22'
+out=$(run_preflight)
+assert_kv DEBUG_PORT 9222 "$out"
+assert_kv DEBUG_REACHABLE optin "$out"
+assert_status NEEDS_OPT_IN "$out"
+
+test_case "runtime: a refused connection is NEEDS_OPT_IN even with a port file"
+configured_chrome
+mkdir -p "$(profile_dir)"
+printf '9333\n/devtools/browser/abc\n' > "$(profile_dir)/DevToolsActivePort"
+stub_cmd pgrep 'echo 4321'
+stub_cmd curl 'printf 000; exit 7'
+out=$(run_preflight)
+assert_kv DEBUG_REACHABLE no "$out"
+assert_status NEEDS_OPT_IN "$out"
+
+test_case "runtime: a 500 from a squatter on the port is treated as optin"
+configured_chrome
+mkdir -p "$(profile_dir)"
+printf '9333\n' > "$(profile_dir)/DevToolsActivePort"
+stub_cmd pgrep 'echo 4321'
+stub_cmd curl 'printf 500; exit 22'
+out=$(run_preflight)
+assert_kv DEBUG_REACHABLE optin "$out"
+assert_status READY "$out"
+
+test_case "runtime: wget maps a server error response to optin"
+configured_chrome
+mkdir -p "$(profile_dir)"
+printf '9333\n' > "$(profile_dir)/DevToolsActivePort"
+stub_cmd pgrep 'echo 4321'
+stub_cmd wget 'exit 8'
+out=$(run_preflight)
+assert_kv DEBUG_REACHABLE optin "$out"
+assert_status READY "$out"
+
+test_case "runtime: wget maps a clean fetch to yes and a transport failure to no"
+configured_chrome
+stub_cmd pgrep 'echo 4321'
+stub_cmd wget 'exit 0'
+out=$(run_preflight)
+assert_kv DEBUG_REACHABLE yes "$out"
+assert_status READY "$out"
+stub_cmd wget 'exit 4'
+out=$(run_preflight)
+assert_kv DEBUG_REACHABLE no "$out"
+assert_status NEEDS_OPT_IN "$out"
+
+test_case "runtime: node maps a non-200 answer to optin"
+configured_chrome
+mkdir -p "$(profile_dir)"
+printf '9333\n' > "$(profile_dir)/DevToolsActivePort"
+stub_cmd pgrep 'echo 4321'
+stub_cmd node 'exit 3'
+out=$(run_preflight)
+assert_kv DEBUG_REACHABLE optin "$out"
+assert_status READY "$out"
+
+test_case "runtime: node maps a 200 to yes and an error to no"
+configured_chrome
+stub_cmd pgrep 'echo 4321'
+stub_cmd node 'exit 0'
+out=$(run_preflight)
+assert_kv DEBUG_REACHABLE yes "$out"
+assert_status READY "$out"
+stub_cmd node 'exit 1'
+out=$(run_preflight)
+assert_kv DEBUG_REACHABLE no "$out"
 assert_status NEEDS_OPT_IN "$out"
 
 # fake_ps CMDLINE... — a process table the pgrep stub matches its -f pattern against,
@@ -365,7 +449,7 @@ test_case "runtime: the real chrome binary is still detected as running"
 configured_chrome
 fake_ps "$CHROMEAGENT_ROOT/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
         '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser'
-stub_cmd curl 'exit 7'
+stub_cmd curl 'printf 000; exit 7'
 out=$(run_preflight)
 assert_kv CHROME_RUNNING yes "$out"
 assert_status NEEDS_OPT_IN "$out"
