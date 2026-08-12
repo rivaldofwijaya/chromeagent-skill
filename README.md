@@ -97,7 +97,7 @@ arguments.
 
 Codex is registered through its CLI rather than a file you write, and it has no project scope, so
 this touches your **global** Codex config. Use the explicit `setup-mcp.sh --agent codex` (or
-`pwsh -File scripts/setup-mcp.ps1 -Agent codex`) when you want to update it:
+`pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent codex`) when you want to update it:
 
 ```bash
 codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest --autoConnect --redactNetworkHeaders

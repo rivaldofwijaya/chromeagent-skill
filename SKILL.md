@@ -35,6 +35,15 @@ Set-Location /path/to/your/project
 pwsh -File /path/to/chromeagent-skill/scripts/preflight.ps1  # native Windows
 ```
 
+The two paths are different directories, and that is the whole trap: the shell sits in the project,
+while the script path points into the installed skill. Worked example for a project at
+`~/code/acme-web` and a skill installed at `~/.claude/skills/chromeagent-skill`:
+
+```bash
+cd ~/code/acme-web                                              # the CWD preflight scans for config
+sh ~/.claude/skills/chromeagent-skill/scripts/preflight.sh      # where the scripts actually live
+```
+
 Both print `KEY=value` lines ending in exactly one `STATUS=`. Preflight reports local runner, Chrome,
 config, and browser/debug state; it does not test whether this agent session has loaded the MCP tools.
 The complete 15-key output contract, in exact order, is:
@@ -53,25 +62,26 @@ Read the `STATUS` and branch. Verdict precedence is first failing check wins: `N
 | STATUS | Do this |
 |---|---|
 | `READY` | If the `chrome-devtools` tools are present, say nothing: `list_pages` → `select_page` → the user's task. If the tools are absent, do not call `list_pages` yet: the config may have just been written, so reload/restart the MCP connection, wait for the tools to appear, then continue. |
-| `NOT_CONFIGURED` | Run `sh scripts/setup-mcp.sh --agent auto` on POSIX or `pwsh -File scripts/setup-mcp.ps1 -Agent auto` on native Windows without asking. The command writes into the current working directory, which must be the project root unless an explicit output directory is supplied. On successful setup the config was just written; reload/restart the MCP connection before calling any tool, because MCP config is read at startup. |
+| `NOT_CONFIGURED` | Run `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto` on POSIX or `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto` on native Windows without asking. The command writes into the current working directory, which must be the project root unless an explicit output directory is supplied. On successful setup the config was just written; reload/restart the MCP connection before calling any tool, because MCP config is read at startup. |
 | `NEEDS_OPT_IN` | Stop. One instruction: "Open `chrome://inspect/#remote-debugging` in Chrome and click Allow." Then re-run preflight. |
 | `CHROME_NOT_RUNNING` | Ask the user to open Chrome normally, then re-run preflight. |
 | `CHROME_TOO_OLD` | Report the actual `CHROME_VERSION` found and that `--autoConnect` needs Chrome 144+. Offer the fallbacks below as an explicit choice. |
 | `CHROME_MISSING` | Say Chrome was not found, and offer the fallbacks below. |
-| `NODE_MISSING` | Ask **once** whether to install Node.js LTS: `winget install OpenJS.NodeJS.LTS` (fallback `choco install nodejs-lts`) / `brew install node` / distro package or `nvm`. Yes → install, re-probe. No → try `bunx`, `pnpm dlx`, or a global `chrome-devtools-mcp` and configure that runner via `--runner`. Neither → hard fail: Node.js LTS is a hard requirement of `chrome-devtools-mcp`. |
+| `NODE_MISSING` | Ask **once** whether to install Node.js LTS: `winget install OpenJS.NodeJS.LTS` (fallback `choco install nodejs-lts`) / `brew install node` / distro package or `nvm`. Yes → install, then open a **new** terminal (or refresh `PATH`) before re-probing: a shell started before the install still has the pre-install `PATH`, so the re-probe reports `NODE_MISSING` again and looks like a failed install. No → try `bunx`, `pnpm dlx`, or a global `chrome-devtools-mcp` and configure that runner via `--runner`. Neither → hard fail: Node.js LTS is a hard requirement of `chrome-devtools-mcp`. |
 
 `NODE_MISSING` means `RUNNER=none`: preflight found no `npx`, `bunx`, `pnpm`, or global
 `chrome-devtools-mcp` runner. If one of those is available, preflight reports that runner instead.
 
 If preflight reports `CHROME_CHANNEL` as `beta`, `dev`, or `canary`, pass that exact reported value through.
-On POSIX use `sh scripts/setup-mcp.sh --agent auto --channel "$CHROME_CHANNEL"`; on native Windows use
-`pwsh -File scripts/setup-mcp.ps1 -Agent auto -Channel $CHROME_CHANNEL`. A non-stable Chrome keeps its
+On POSIX use `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto --channel "$CHROME_CHANNEL"`;
+on native Windows use `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto -Channel $CHROME_CHANNEL`.
+A non-stable Chrome keeps its
 profile in a different directory and `--autoConnect` must be told which one. Omit the channel flag for
 `stable`.
 
 The POSIX setup CLI accepts agents `auto|claude|codex|opencode`, plus `--runner "<argv>"`,
 `--channel beta|dev|canary`, `--out-dir <dir>`, and `--no-redact`. The native PowerShell spelling is `-Agent`, `-Runner`, `-Channel`, and `-NoRedact`; add `-OutDir <dir>` for the output-directory override. It accepts the same three channel values. On native Windows, use
-`pwsh -File scripts/setup-mcp.ps1 -Agent auto` for the setup branch above. Both setup CLIs use exit 0
+`pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto` for the setup branch above. Both setup CLIs use exit 0
 for success and exit 2 for bad usage or invalid agent/channel values. Exit 3 is a setup failure on
 either platform, not a preflight verdict and not synonymous with manual merge.
 
