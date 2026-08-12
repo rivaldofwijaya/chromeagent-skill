@@ -116,13 +116,14 @@ $chrome = $null
 $version = 'unknown'
 $major = 0
 $udd = ''
-if ($runner[0] -ne 'none') {
-  $chrome = Get-ChromeInfo
-  if ($chrome) {
-    $version = $chrome.Version
-    $major = Get-Major $version
-    $udd = $chrome.UserDataDir
-  }
+# Mirrors preflight.sh: Chrome discovery is unconditional. A missing runner is
+# not evidence about Chrome, and $status still tests $runner[0] first, so this
+# changes diagnostic fields only.
+$chrome = Get-ChromeInfo
+if ($chrome) {
+  $version = $chrome.Version
+  $major = Get-Major $version
+  $udd = $chrome.UserDataDir
 }
 $running = if (Get-Process -Name 'chrome' -ErrorAction SilentlyContinue) { 'yes' } else { 'no' }
 $port    = Get-DebugPort $udd
