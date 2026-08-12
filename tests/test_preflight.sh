@@ -453,3 +453,58 @@ stub_cmd curl 'printf 000; exit 7'
 out=$(run_preflight)
 assert_kv CHROME_RUNNING yes "$out"
 assert_status NEEDS_OPT_IN "$out"
+
+# runnerless_chrome — a modern Chrome at the macOS stable path and, deliberately,
+# no runner stub: the state the Windows report was filed from.
+runnerless_chrome() {
+  stub_cmd uname 'echo Darwin'
+  fake_chrome "$CHROMEAGENT_ROOT/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+    "Google Chrome 145.0.7300.20"
+}
+
+test_case "chrome: a missing runner does not blank the chrome fields"
+runnerless_chrome
+out=$(run_preflight)
+assert_kv RUNNER none "$out"
+assert_status NODE_MISSING "$out"
+assert_kv CHROME_PATH "$CHROMEAGENT_ROOT/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" "$out"
+assert_kv CHROME_CHANNEL stable "$out"
+assert_kv CHROME_VERSION "145.0.7300.20" "$out"
+assert_kv CHROME_MAJOR 145 "$out"
+assert_kv CHROME_OK yes "$out"
+assert_kv USER_DATA_DIR "$(profile_dir)" "$out"
+
+test_case "precedence: a missing runner still outranks a configured project"
+runnerless_chrome
+write_mcp_json "$SANDBOX/project/.mcp.json"
+out=$(run_preflight)
+assert_kv MCP_CONFIGURED yes "$out"
+assert_kv CHROME_OK yes "$out"
+assert_status NODE_MISSING "$out"
+
+test_case "runtime: the port file is read even when no runner is installed"
+runnerless_chrome
+mkdir -p "$(profile_dir)"
+printf '9333\n/devtools/browser/abc\n' > "$(profile_dir)/DevToolsActivePort"
+stub_cmd pgrep 'echo 4321'
+stub_cmd curl 'printf 404; exit 22'
+out=$(run_preflight)
+assert_kv DEBUG_PORT 9333 "$out"
+assert_kv DEBUG_REACHABLE optin "$out"
+assert_status NODE_MISSING "$out"
+
+test_case "chrome: the windows user data dir uses one separator convention"
+stub_cmd uname 'echo MINGW64_NT-10.0'
+unset ProgramFiles 2>/dev/null || true
+LOCALAPPDATA='C:\Users\Alice\AppData\Local'
+export LOCALAPPDATA
+fake_chrome "${CHROMEAGENT_ROOT}C:/Program Files/Google/Chrome/Application/chrome.exe" "x"
+out=$(run_preflight)
+assert_kv CHROME_PATH "${CHROMEAGENT_ROOT}C:/Program Files/Google/Chrome/Application/chrome.exe" "$out"
+assert_kv USER_DATA_DIR 'C:/Users/Alice/AppData/Local/Google/Chrome/User Data' "$out"
+if printf '%s\n' "$out" | grep '^USER_DATA_DIR=' | grep -q '\\'; then
+  _fail "USER_DATA_DIR contains a backslash"
+else
+  _ok "USER_DATA_DIR has no backslash"
+fi
+unset LOCALAPPDATA
