@@ -70,8 +70,8 @@ skill_assert_fixed '`--autoConnect` needs Chrome 144+' "$body"
 test_case "SKILL.md: documents platform setup flags, channels, and exit failures"
 skill="$REPO_ROOT/SKILL.md"
 body=$(cat "$skill")
-skill_assert_fixed 'sh scripts/setup-mcp.sh --agent auto --channel "$CHROME_CHANNEL"' "$body"
-skill_assert_fixed 'pwsh -File scripts/setup-mcp.ps1 -Agent auto -Channel $CHROME_CHANNEL' "$body"
+skill_assert_fixed 'sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto --channel "$CHROME_CHANNEL"' "$body"
+skill_assert_fixed 'pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto -Channel $CHROME_CHANNEL' "$body"
 skill_assert_fixed '`--runner "<argv>"`' "$body"
 skill_assert_fixed '`--channel beta|dev|canary`' "$body"
 skill_assert_fixed '`-Agent`, `-Runner`, `-Channel`, and `-NoRedact`' "$body"
@@ -222,3 +222,34 @@ for expected in \
   'If `CHROME_CHANNEL=chromium`, do not pass `--channel chromium`'; do
   skill_assert_fixed "$expected" "$body"
 done
+
+test_case "docs: every script invocation resolves from the project root"
+skill=$(cat "$REPO_ROOT/SKILL.md")
+readme=$(cat "$REPO_ROOT/README.md")
+# A bare relative path fails from the project root, because scripts/ lives under
+# the installed skill directory and preflight must run in the project.
+for bare in \
+  'sh scripts/setup-mcp.sh' \
+  'pwsh -File scripts/setup-mcp.ps1' \
+  'sh scripts/preflight.sh' \
+  'pwsh -File scripts/preflight.ps1'; do
+  if printf '%s\n' "$skill" | grep -F -q -- "$bare"; then
+    _fail "SKILL.md has a bare relative invocation: $bare"
+  else
+    _ok "SKILL.md has no bare '$bare'"
+  fi
+  if printf '%s\n' "$readme" | grep -F -q -- "$bare"; then
+    _fail "README.md has a bare relative invocation: $bare"
+  else
+    _ok "README.md has no bare '$bare'"
+  fi
+done
+skill_assert_fixed 'sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto' "$skill"
+skill_assert_fixed 'pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto' "$skill"
+
+test_case "docs: the NODE_MISSING row warns that a pre-install shell has a stale PATH"
+skill="$REPO_ROOT/SKILL.md"
+table=$(sed -n '/^| STATUS | Do this |$/,/^$/p' "$skill")
+node_row=$(printf '%s\n' "$table" | grep '^| `NODE_MISSING` |')
+skill_assert_fixed 'open a **new** terminal (or refresh `PATH`) before re-probing' "$node_row"
+skill_assert_fixed 'still has the pre-install `PATH`' "$node_row"
