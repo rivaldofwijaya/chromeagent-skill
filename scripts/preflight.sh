@@ -82,6 +82,14 @@ chrome_candidates() {
       pf86="${ProgramFiles_x86:-$(env | sed -n 's/^ProgramFiles(x86)=//p')}"
       [ -n "$pf86" ] || pf86='C:/Program Files (x86)'
       lad="${LOCALAPPDATA:-$HOME/AppData/Local}"
+      # Windows sets these with backslashes. Normalise at the source so
+      # CHROME_PATH, USER_DATA_DIR, and the DevToolsActivePort path built from
+      # it share one convention by construction — and there is one place to be
+      # wrong instead of six. Forward slashes are what this script's consumers
+      # expect, and what `-f` needs in Git Bash.
+      pf=$(printf '%s' "$pf" | tr '\\' '/')
+      pf86=$(printf '%s' "$pf86" | tr '\\' '/')
+      lad=$(printf '%s' "$lad" | tr '\\' '/')
       for channel in stable beta dev canary; do
         for base in "$ROOT$pf" "$ROOT$pf86" "$ROOT$lad"; do
           case "$channel" in
@@ -253,16 +261,17 @@ main() {
   CHROME_VERSION=unknown
   CHROME_MAJOR=0
 
-  if [ "$RUNNER" != none ]; then
-    hit=$(find_chrome "$PLATFORM" | sed -n '1p')
-    if [ -n "$hit" ]; then
-      CHROME_CHANNEL=${hit%%|*}
-      rest=${hit#*|}
-      CHROME_PATH=${rest%%|*}
-      USER_DATA_DIR=${rest#*|}
-      CHROME_VERSION=$(chrome_version "$CHROME_PATH" "$PLATFORM")
-      CHROME_MAJOR=$(major_of "$CHROME_VERSION")
-    fi
+  # Chrome discovery is unconditional: a missing runner is not evidence about
+  # Chrome. STATUS precedence still tests RUNNER first, so this cannot change a
+  # verdict — only the diagnostic fields.
+  hit=$(find_chrome "$PLATFORM" | sed -n '1p')
+  if [ -n "$hit" ]; then
+    CHROME_CHANNEL=${hit%%|*}
+    rest=${hit#*|}
+    CHROME_PATH=${rest%%|*}
+    USER_DATA_DIR=${rest#*|}
+    CHROME_VERSION=$(chrome_version "$CHROME_PATH" "$PLATFORM")
+    CHROME_MAJOR=$(major_of "$CHROME_VERSION")
   fi
 
   if [ "$CHROME_MAJOR" -ge "$CHROME_MIN_MAJOR" ]; then CHROME_OK=yes; else CHROME_OK=no; fi
