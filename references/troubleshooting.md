@@ -109,6 +109,18 @@ server loads at agent startup.
   `READY` only when Chrome's `DevToolsActivePort` file is also present, so the two together are the
   evidence; the real connection remains the final test. `DEBUG_REACHABLE=yes` means the classic
   `--remote-debugging-port` launch, which does serve `/json/version` over plain HTTP.
+- An uncommon false `READY` can occur if `DevToolsActivePort` is stale. Chrome does not delete the
+  file when opt-in is revoked, and preflight trusts line 1 both as the port to probe and as the port-file
+  corroboration. If an unrelated listener occupies that port and returns any non-200 response, preflight
+  sees `DEBUG_REACHABLE=optin` plus the port file and reports `STATUS=READY`, even though Chrome is not
+  serving DevTools there. `READY` validates local conditions only; the real connection remains the final
+  test. To tell, run `lsof -nP -iTCP:<port> -sTCP:LISTEN` and confirm the listener is a Google Chrome
+  process, then check that line 1 of
+  `"$HOME/Library/Application Support/Google/Chrome/DevToolsActivePort"` is the port you expect. On
+  Windows the file is under `%LOCALAPPDATA%\Google\Chrome\User Data\`. Delete the stale file and/or
+  free the port, re-do the opt-in, and re-run preflight; Chrome rewrites the file when opt-in is granted.
+  A stale file with nothing listening yields `DEBUG_REACHABLE=no` and correctly leads to
+  `NEEDS_OPT_IN`, so this is a rare squatter edge case, not a routine failure.
 - Preflight reports `DEBUG_REACHABLE=unknown` on machines with no `curl`, `wget`, or `node` to probe
   with. If a port file existed it still reports `READY` and lets the real connection be the test,
   so a failure here means the endpoint genuinely is not answering. Re-do the opt-in.
