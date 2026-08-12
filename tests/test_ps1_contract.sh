@@ -26,18 +26,18 @@ out=$(run_ps1)
 unset ProgramFiles LOCALAPPDATA
 assert_kv CHROME_CHANNEL stable "$out"
 
-test_case "ps1: no runner keeps Chrome fields at sh defaults"
+test_case "ps1: a missing runner does not blank the chrome fields"
 link_host_tool pwsh
 export CHROMEAGENT_FAKE_CHROME="stable|C:/fake/chrome.exe|145.0.7300.20|C:/fake/UserData"
 out=$(run_ps1)
 unset CHROMEAGENT_FAKE_CHROME
 assert_kv RUNNER none "$out"
-assert_kv CHROME_PATH none "$out"
-assert_kv CHROME_CHANNEL none "$out"
-assert_kv CHROME_VERSION unknown "$out"
-assert_kv CHROME_MAJOR 0 "$out"
-assert_kv CHROME_OK no "$out"
-assert_kv USER_DATA_DIR "" "$out"
+assert_kv CHROME_PATH "C:/fake/chrome.exe" "$out"
+assert_kv CHROME_CHANNEL stable "$out"
+assert_kv CHROME_VERSION "145.0.7300.20" "$out"
+assert_kv CHROME_MAJOR 145 "$out"
+assert_kv CHROME_OK yes "$out"
+assert_kv USER_DATA_DIR "C:/fake/UserData" "$out"
 assert_kv DEBUG_PORT 9222 "$out"
 assert_status NODE_MISSING "$out"
 
