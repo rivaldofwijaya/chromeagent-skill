@@ -295,6 +295,32 @@ assert_kv DEBUG_PORT 9222 "$out"
 assert_kv DEBUG_REACHABLE unknown "$out"
 assert_status NEEDS_OPT_IN "$out"
 
+# The probe must reach 127.0.0.1 directly. curl, wget and PowerShell all honour
+# http_proxy for a loopback URL, so a proxied host would let an unrelated server
+# answer for Chrome. These stubs answer only when the proxy environment is clear.
+proxy_env() { http_proxy=http://192.0.2.9:8080 HTTP_PROXY=$http_proxy; export http_proxy HTTP_PROXY; }
+proxy_sensitive='if [ -n "${http_proxy:-}${HTTP_PROXY:-}${all_proxy:-}${ALL_PROXY:-}" ]; then'
+
+test_case "runtime: curl probes the port directly when a proxy is configured"
+configured_chrome
+proxy_env
+stub_cmd pgrep 'echo 4321'
+stub_cmd curl "$proxy_sensitive printf 000; exit 5; fi; printf 200"
+out=$(run_preflight)
+unset http_proxy HTTP_PROXY
+assert_kv DEBUG_REACHABLE yes "$out"
+assert_status READY "$out"
+
+test_case "runtime: wget probes the port directly when a proxy is configured"
+configured_chrome
+proxy_env
+stub_cmd pgrep 'echo 4321'
+stub_cmd wget "$proxy_sensitive exit 4; fi; exit 0"
+out=$(run_preflight)
+unset http_proxy HTTP_PROXY
+assert_kv DEBUG_REACHABLE yes "$out"
+assert_status READY "$out"
+
 test_case "precedence: an old chrome outranks a missing config"
 stub_cmd uname 'echo Darwin'
 stub_cmd npx 'exit 0'
