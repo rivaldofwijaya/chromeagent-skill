@@ -77,13 +77,16 @@ function Get-DebugReachable([string]$port) {
   # something answered — that is the chrome://inspect opt-in endpoint, which is
   # WebSocket-only and serves 404 for every HTTP path.
   $uri = "http://127.0.0.1:$port/json/version"
-  $skip = (Get-Command Invoke-WebRequest).Parameters.ContainsKey('SkipHttpErrorCheck')
+  $params = @{ Uri = $uri; TimeoutSec = 2; UseBasicParsing = $true; ErrorAction = 'Stop' }
+  $cmd = Get-Command Invoke-WebRequest
+  if ($cmd.Parameters.ContainsKey('SkipHttpErrorCheck')) { $params['SkipHttpErrorCheck'] = $true }
+  # PowerShell 7 honours http_proxy for a loopback URL, so -NoProxy forces the
+  # direct connection preflight.sh gets by clearing the proxy environment.
+  # Windows PowerShell 5.1 has no such parameter and relies on .NET's
+  # BypassProxyOnLocal, which exempts 127.0.0.1.
+  if ($cmd.Parameters.ContainsKey('NoProxy')) { $params['NoProxy'] = $true }
   try {
-    if ($skip) {
-      $r = Invoke-WebRequest -Uri $uri -TimeoutSec 2 -UseBasicParsing -SkipHttpErrorCheck -ErrorAction Stop
-    } else {
-      $r = Invoke-WebRequest -Uri $uri -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
-    }
+    $r = Invoke-WebRequest @params
     if (-not $r) { return 'no' }
     if ($r.StatusCode -eq 200) { return 'yes' }
     return 'optin'
