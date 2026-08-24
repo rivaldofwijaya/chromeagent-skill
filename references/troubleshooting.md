@@ -80,14 +80,16 @@ preflight.
 
 The opt-in endpoint is **WebSocket-only**. It exposes exactly the browser endpoint named on line 2
 of `DevToolsActivePort` and answers `404` to every HTTP path, including `/json/version` and the rest
-of the `/json/*` family. A manual `curl http://127.0.0.1:9222/json/version` returning `404` is
-therefore **not** evidence of a broken setup — it is what a healthy opt-in looks like. The checks
-that do work:
+of the `/json/*` family. A manual `curl http://127.0.0.1:<DEBUG_PORT>/json/version` returning `404` is
+therefore **not** evidence of a broken setup — it is what a healthy opt-in looks like.
 
-- `lsof -nP -iTCP:9222 -sTCP:LISTEN` — something is listening on the port.
-- `cat "$HOME/Library/Application Support/Google/Chrome/DevToolsActivePort"` — line 1 is the port,
-  line 2 is the `/devtools/browser/<uuid>` path. On Windows the file lives in
-  `%LOCALAPPDATA%\Google\Chrome\User Data\`.
+Use the values preflight already printed — `DEBUG_PORT` and `USER_DATA_DIR` — rather than the
+defaults. A beta, dev, or canary profile has its own directory, and Chrome can pick a port other
+than 9222. The checks that do work:
+
+- `lsof -nP -iTCP:<DEBUG_PORT> -sTCP:LISTEN` — something is listening on the port.
+- `cat "<USER_DATA_DIR>/DevToolsActivePort"` — line 1 is the port, line 2 is the
+  `/devtools/browser/<uuid>` path.
 
 Preflight reports this state as `DEBUG_REACHABLE=optin`.
 
@@ -114,11 +116,11 @@ server loads at agent startup.
   corroboration. If an unrelated listener occupies that port and returns any non-200 response, preflight
   sees `DEBUG_REACHABLE=optin` plus the port file and reports `STATUS=READY`, even though Chrome is not
   serving DevTools there. `READY` validates local conditions only; the real connection remains the final
-  test. To tell, run `lsof -nP -iTCP:<port> -sTCP:LISTEN` and confirm the listener is a Google Chrome
-  process, then check that line 1 of
-  `"$HOME/Library/Application Support/Google/Chrome/DevToolsActivePort"` is the port you expect. On
-  Windows the file is under `%LOCALAPPDATA%\Google\Chrome\User Data\`. Delete the stale file and/or
-  free the port, re-do the opt-in, and re-run preflight; Chrome rewrites the file when opt-in is granted.
+  test. To tell, run `lsof -nP -iTCP:<DEBUG_PORT> -sTCP:LISTEN` and confirm the listener is a Google
+  Chrome process, then check that line 1 of `<USER_DATA_DIR>/DevToolsActivePort` is the port you
+  expect — taking both values from preflight's own output rather than assuming port 9222 and the
+  stable-channel profile. Delete the stale file and/or free the port, re-do the opt-in, and re-run
+  preflight; Chrome rewrites the file when opt-in is granted.
   A stale file with nothing listening yields `DEBUG_REACHABLE=no` and correctly leads to
   `NEEDS_OPT_IN`, so this is a rare squatter edge case, not a routine failure.
 - Preflight reports `DEBUG_REACHABLE=unknown` on machines with no `curl`, `wget`, or `node` to probe
