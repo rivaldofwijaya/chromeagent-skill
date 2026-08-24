@@ -213,12 +213,18 @@ debug_port() {
 # The question is "did anything answer", not "was the answer 200". Chrome's
 # chrome://inspect opt-in endpoint is WebSocket-only and serves 404 for every
 # HTTP path, including /json/version; a dead port answers nothing at all.
+# The probe must reach loopback directly: curl and wget both send a 127.0.0.1
+# URL through http_proxy if one is set, which would let a proxy answer for
+# Chrome. Clearing the variables works for every client, including BusyBox
+# wget, which rejects --no-proxy.
 debug_reachable() {
   url="http://127.0.0.1:$1/json/version"
+  no_proxy_env="http_proxy= HTTP_PROXY= https_proxy= HTTPS_PROXY= all_proxy= ALL_PROXY="
   if command -v curl >/dev/null 2>&1; then
     # %{http_code} is 000 when no response was received, so curl's exit
     # status is not consulted.
-    code=$(curl -s -o /dev/null -w '%{http_code}' -m 2 "$url" 2>/dev/null)
+    code=$(env $no_proxy_env curl -s -o /dev/null -w '%{http_code}' \
+      --noproxy '*' -m 2 "$url" 2>/dev/null)
     case "$code" in
       200) printf 'yes\n' ;;
       ''|000|0|*[!0-9]*) printf 'no\n' ;;
@@ -227,7 +233,7 @@ debug_reachable() {
     return
   fi
   if command -v wget >/dev/null 2>&1; then
-    wget -q -T 2 -O /dev/null "$url" >/dev/null 2>&1
+    env $no_proxy_env wget -q -T 2 -O /dev/null "$url" >/dev/null 2>&1
     rc=$?
     case "$rc" in
       0) printf 'yes\n' ;;
@@ -237,6 +243,7 @@ debug_reachable() {
     return
   fi
   if command -v node >/dev/null 2>&1; then
+    # No scrubbing here: node's http.get ignores the proxy environment.
     node -e "const t=setTimeout(()=>process.exit(1),2000);require('http').get('$url',r=>{clearTimeout(t);r.resume();process.exit(r.statusCode===200?0:3)}).on('error',()=>{clearTimeout(t);process.exit(1)})" \
       >/dev/null 2>&1
     rc=$?
