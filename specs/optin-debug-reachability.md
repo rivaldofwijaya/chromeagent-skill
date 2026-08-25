@@ -311,6 +311,8 @@ Covered by two cases in `tests/test_preflight.sh`, alongside the direct-loopback
 2026-08-24 amendment added: one stubs a GNU wget whose proxy answers unless `--no-proxy` is
 passed, the other a BusyBox wget that rejects the flag and must still probe via the environment.
 
+Landed in `5b03fdb`.
+
 **Still open, deliberately.** Two known imprecisions were re-raised on 2026-08-24 and left alone:
 
 - §3.3's residual risk stands — a stale `DevToolsActivePort` plus any squatter answering non-200
