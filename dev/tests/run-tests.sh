@@ -2,8 +2,8 @@
 # Test harness for chromeagent-skill. POSIX sh, no dependencies.
 set -u
 
-REPO_ROOT=$(cd "$(dirname "$0")/.." && pwd)
-TMP_ROOT="$REPO_ROOT/tests/.tmp"
+REPO_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+TMP_ROOT="$REPO_ROOT/dev/tests/.tmp"
 PASS=0
 FAIL=0
 CURRENT=""
@@ -56,11 +56,11 @@ stub_cmd() {
 }
 
 run_preflight() {
-  (cd "$SANDBOX/project" && sh "$REPO_ROOT/scripts/preflight.sh" 2>/dev/null)
+  (cd "$SANDBOX/project" && sh "$REPO_ROOT/src/scripts/preflight.sh" 2>/dev/null)
 }
 
 run_setup() {
-  (cd "$SANDBOX/project" && sh "$REPO_ROOT/scripts/setup-mcp.sh" "$@" 2>&1)
+  (cd "$SANDBOX/project" && sh "$REPO_ROOT/src/scripts/setup-mcp.sh" "$@" 2>&1)
 }
 
 test_case() { CURRENT="$1"; sandbox_new; }
@@ -99,7 +99,7 @@ finish() {
 mkdir -p "$TMP_ROOT"
 rm -rf "$TMP_ROOT"/sb* 2>/dev/null || true
 
-for f in "$REPO_ROOT"/tests/test_*.sh; do
+for f in "$REPO_ROOT"/dev/tests/test_*.sh; do
   [ -f "$f" ] || continue
   printf '\n== %s ==\n' "$(basename "$f")"
   . "$f"

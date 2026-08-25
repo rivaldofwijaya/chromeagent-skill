@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: chrome-devtools-mcp issues
+    url: https://github.com/ChromeDevTools/chrome-devtools-mcp/issues
+    about: Report bugs in the MCP server itself, not in this skill.
+  - name: Troubleshooting guide
+    url: https://github.com/rivaldofwijaya/chromeagent-skill/blob/main/src/references/troubleshooting.md
+    about: Connection, port, and profile problems are usually covered here.
