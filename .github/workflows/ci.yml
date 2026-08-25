@@ -22,7 +22,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run the suite
         run: dev/tests/run-tests.sh
 
@@ -30,7 +30,7 @@ jobs:
     name: shellcheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Lint POSIX shell
@@ -44,7 +44,7 @@ jobs:
       matrix:
         shell: [pwsh, powershell]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Parse the PowerShell scripts
         shell: ${{ matrix.shell }} {0}
         run: |

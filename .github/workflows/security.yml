@@ -18,7 +18,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # This repository ships shell and PowerShell, which CodeQL does not analyse.
       # The workflows themselves are the analysable attack surface.
       - uses: github/codeql-action/init@v4
