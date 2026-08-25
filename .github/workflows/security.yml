@@ -1,0 +1,27 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  codeql:
+    name: CodeQL (actions)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      # This repository ships shell and PowerShell, which CodeQL does not analyse.
+      # The workflows themselves are the analysable attack surface.
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: actions
+      - uses: github/codeql-action/analyze@v3

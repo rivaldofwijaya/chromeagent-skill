@@ -561,7 +561,7 @@ fi
 run_setup_timeout() {
   # run_setup_timeout SECONDS ARGS... -> prints "rc=<code>" or "rc=TIMEOUT"
   secs="$1"; shift
-  ( cd "$SANDBOX/project" && sh "$REPO_ROOT/scripts/setup-mcp.sh" "$@" >/dev/null 2>&1 ) &
+  ( cd "$SANDBOX/project" && sh "$REPO_ROOT/src/scripts/setup-mcp.sh" "$@" >/dev/null 2>&1 ) &
   rp=$!
   ( sleep "$secs"; kill -9 "$rp" 2>/dev/null ) &
   wp=$!

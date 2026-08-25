@@ -1,0 +1,6 @@
+# Default owner for everything in this repository.
+*                       @rivaldofwijaya
+
+# The shipped skill and the suite that guards it move together.
+/src/                   @rivaldofwijaya
+/dev/tests/             @rivaldofwijaya

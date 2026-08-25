@@ -4,7 +4,7 @@ skill_assert_fixed() {
 }
 
 test_case "SKILL.md: has frontmatter with name and description"
-skill="$REPO_ROOT/SKILL.md"
+skill="$REPO_ROOT/src/SKILL.md"
 head=$(head -5 "$skill")
 assert_contains '^---' "$head"
 assert_contains 'name: chromeagent' "$head"
@@ -18,7 +18,7 @@ closing=$(sed -n '2,20p' "$skill" | grep -n '^---$' | head -1 | cut -d: -f1)
 if [ -n "$closing" ]; then _ok "frontmatter has a closing delimiter"; else _fail "missing closing frontmatter delimiter"; fi
 
 test_case "SKILL.md: documents every verdict as a decision-table branch"
-skill="$REPO_ROOT/SKILL.md"
+skill="$REPO_ROOT/src/SKILL.md"
 table=$(sed -n '/^| STATUS | Do this |$/,/^$/p' "$skill")
 for v in READY NOT_CONFIGURED NEEDS_OPT_IN CHROME_NOT_RUNNING CHROME_TOO_OLD CHROME_MISSING NODE_MISSING; do
   rows=$(printf '%s\n' "$table" | grep -c "^| \`$v\` |")
@@ -26,7 +26,7 @@ for v in READY NOT_CONFIGURED NEEDS_OPT_IN CHROME_NOT_RUNNING CHROME_TOO_OLD CHR
 done
 
 test_case "SKILL.md: puts the fast path section before the preflight script"
-skill="$REPO_ROOT/SKILL.md"
+skill="$REPO_ROOT/src/SKILL.md"
 fast_heading=$(grep -n '^## 1\. Fast path' "$skill" | head -1 | cut -d: -f1)
 pre_heading=$(grep -n '^## 2\. Preflight$' "$skill" | head -1 | cut -d: -f1)
 preflight_command=$(grep -n '^sh /path/to/chromeagent-skill/scripts/preflight\.sh' "$skill" | head -1 | cut -d: -f1)
@@ -40,7 +40,7 @@ else
 fi
 
 test_case "SKILL.md: reloads absent MCP tools and permits remediation reruns"
-skill="$REPO_ROOT/SKILL.md"
+skill="$REPO_ROOT/src/SKILL.md"
 body=$(cat "$skill")
 table=$(sed -n '/^| STATUS | Do this |$/,/^$/p' "$skill")
 ready_row=$(printf '%s\n' "$table" | grep '^| `READY` |')
@@ -55,7 +55,7 @@ skill_assert_fixed 'Do not use it as idle polling' "$body"
 skill_assert_fixed 'reruns and re-probes after remediation or a user action are expected' "$body"
 
 test_case "SKILL.md: documents the preflight contract and decision signal"
-skill="$REPO_ROOT/SKILL.md"
+skill="$REPO_ROOT/src/SKILL.md"
 body=$(cat "$skill")
 expected_keys='`PLATFORM`, `RUNNER`, `RUNNER_CMD`, `CHROME_PATH`, `CHROME_CHANNEL`, `CHROME_VERSION`, `CHROME_MAJOR`, `CHROME_OK`, `USER_DATA_DIR`, `CHROME_RUNNING`, `DEBUG_PORT`, `DEBUG_REACHABLE`, `MCP_CONFIG_FILE`, `MCP_CONFIGURED`, `STATUS`.'
 keys_line=$(grep '^`PLATFORM`' "$skill" | head -1)
@@ -68,7 +68,7 @@ skill_assert_fixed '`STATUS` value is the signal; never branch on preflight' "$s
 skill_assert_fixed '`--autoConnect` needs Chrome 144+' "$body"
 
 test_case "SKILL.md: documents platform setup flags, channels, and exit failures"
-skill="$REPO_ROOT/SKILL.md"
+skill="$REPO_ROOT/src/SKILL.md"
 body=$(cat "$skill")
 skill_assert_fixed 'sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto --channel "$CHROME_CHANNEL"' "$body"
 skill_assert_fixed 'pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto -Channel $CHROME_CHANNEL' "$body"
@@ -83,7 +83,7 @@ skill_assert_fixed 'invalid existing JSON and Codex registration failures can al
 skill_assert_fixed 'does not use the sh manual-merge branch' "$body"
 
 test_case "docs: documents the cwd contract, output directory, and auto scope"
-skill=$(cat "$REPO_ROOT/SKILL.md")
+skill=$(cat "$REPO_ROOT/src/SKILL.md")
 readme=$(cat "$REPO_ROOT/README.md")
 cwd_sentence="Both setup scripts resolve paths relative to the current working directory, so run them from the project root; the skill's own directory is never the right place."
 auto_sentence='`auto` configures project-scoped agents only (Claude Code and OpenCode); Codex requires an explicit `--agent codex` and writes the user'\''s global `~/.codex/config.toml`.'
@@ -107,11 +107,11 @@ skill_assert_fixed 'setup-mcp: codex detected but not configured; run --agent co
 skill_assert_fixed 'setup-mcp: codex detected but not configured; run -Agent codex to update your global Codex config.' "$readme"
 
 test_case "docs: troubleshooting covers a wrong-directory setup"
-body=$(cat "$REPO_ROOT/references/troubleshooting.md")
+body=$(cat "$REPO_ROOT/src/references/troubleshooting.md")
 skill_assert_fixed '## Config was written to the wrong directory' "$body"
 
 test_case "SKILL.md: names both script flavours and the confirm-first policy"
-skill="$REPO_ROOT/SKILL.md"
+skill="$REPO_ROOT/src/SKILL.md"
 body=$(cat "$skill")
 action=$(sed -n '/^## 6\. Action policy/,/^## 7\. Sensitive data/p' "$skill")
 assert_contains 'preflight.sh' "$body"
@@ -141,7 +141,7 @@ for expected in \
 done
 
 test_case "docs: troubleshooting names every verdict and gives the READY tools fix"
-body=$(cat "$REPO_ROOT/references/troubleshooting.md")
+body=$(cat "$REPO_ROOT/src/references/troubleshooting.md")
 for expected in \
   '## `READY` but the MCP tools are absent from the session' \
   '## `NOT_CONFIGURED`' \
@@ -157,7 +157,7 @@ for expected in \
 done
 
 test_case "docs: SKILL.md's reference link resolves"
-if [ -f "$REPO_ROOT/references/troubleshooting.md" ]; then _ok "troubleshooting.md exists"; else _fail "dangling reference"; fi
+if [ -f "$REPO_ROOT/src/references/troubleshooting.md" ]; then _ok "troubleshooting.md exists"; else _fail "dangling reference"; fi
 
 test_case "docs: README mirrors shipped agent config targets and platform flags"
 body=$(cat "$REPO_ROOT/README.md")
@@ -196,7 +196,7 @@ for expected in \
 done
 
 test_case "docs: troubleshooting covers shipped failure causes and fixes"
-body=$(cat "$REPO_ROOT/references/troubleshooting.md")
+body=$(cat "$REPO_ROOT/src/references/troubleshooting.md")
 for expected in \
   '## `NODE_MISSING`' \
   '## `CHROME_MISSING`' \
@@ -224,7 +224,7 @@ for expected in \
 done
 
 test_case "docs: every script invocation resolves from the project root"
-skill=$(cat "$REPO_ROOT/SKILL.md")
+skill=$(cat "$REPO_ROOT/src/SKILL.md")
 readme=$(cat "$REPO_ROOT/README.md")
 # A bare relative path fails from the project root, because scripts/ lives under
 # the installed skill directory and preflight must run in the project.
@@ -248,7 +248,7 @@ skill_assert_fixed 'sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent a
 skill_assert_fixed 'pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto' "$skill"
 
 test_case "docs: the NODE_MISSING row warns that a pre-install shell has a stale PATH"
-skill="$REPO_ROOT/SKILL.md"
+skill="$REPO_ROOT/src/SKILL.md"
 table=$(sed -n '/^| STATUS | Do this |$/,/^$/p' "$skill")
 node_row=$(printf '%s\n' "$table" | grep '^| `NODE_MISSING` |')
 skill_assert_fixed 'open a **new** terminal (or refresh `PATH`) before re-probing' "$node_row"

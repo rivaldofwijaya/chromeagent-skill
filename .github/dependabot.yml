@@ -1,0 +1,10 @@
+version: 2
+updates:
+  # This repository ships shell and PowerShell scripts, not a package manifest,
+  # so GitHub Actions are the only dependency ecosystem to track.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci

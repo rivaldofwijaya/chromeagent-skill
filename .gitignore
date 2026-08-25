@@ -1,4 +1,4 @@
 .DS_Store
 node_modules/
-tests/.tmp/
-docs/
+dev/tests/.tmp/
+dev/docs/superpowers/
