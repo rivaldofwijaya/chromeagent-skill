@@ -82,9 +82,18 @@ function Get-DebugReachable([string]$port) {
   if ($cmd.Parameters.ContainsKey('SkipHttpErrorCheck')) { $params['SkipHttpErrorCheck'] = $true }
   # PowerShell 7 honours http_proxy for a loopback URL, so -NoProxy forces the
   # direct connection preflight.sh gets by clearing the proxy environment.
-  # Windows PowerShell 5.1 has no such parameter and relies on .NET's
-  # BypassProxyOnLocal, which exempts 127.0.0.1.
-  if ($cmd.Parameters.ContainsKey('NoProxy')) { $params['NoProxy'] = $true }
+  # Windows PowerShell 5.1 has no such parameter: Invoke-WebRequest inherits
+  # WebRequest.DefaultWebProxy, i.e. whatever the system proxy is. Loopback is
+  # normally exempt, but that is a property of the configured proxy rather than
+  # a guarantee, so null the default for the duration of the probe instead.
+  $hasNoProxy = $cmd.Parameters.ContainsKey('NoProxy')
+  $savedProxy = $null
+  if ($hasNoProxy) {
+    $params['NoProxy'] = $true
+  } else {
+    $savedProxy = [System.Net.WebRequest]::DefaultWebProxy
+    [System.Net.WebRequest]::DefaultWebProxy = $null
+  }
   try {
     $r = Invoke-WebRequest @params
     if (-not $r) { return 'no' }
@@ -95,6 +104,8 @@ function Get-DebugReachable([string]$port) {
     # its absence means a transport failure.
     if ($_.Exception.Response) { return 'optin' }
     return 'no'
+  } finally {
+    if (-not $hasNoProxy) { [System.Net.WebRequest]::DefaultWebProxy = $savedProxy }
   }
 }
 

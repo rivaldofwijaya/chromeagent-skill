@@ -320,6 +320,30 @@ out=$(run_preflight)
 unset http_proxy HTTP_PROXY
 assert_kv DEBUG_REACHABLE yes "$out"
 assert_status READY "$out"
+# A GNU build advertises --no-proxy on its help screen; a BusyBox build does not
+# and rejects the flag. no_proxy_exit CODE builds a stub clause exiting CODE when
+# the probe passed --no-proxy.
+gnu_wget_help='if [ "$1" = --help ]; then echo "  --no-proxy   explicitly turn off proxy"; exit 0; fi'
+busybox_wget_help='if [ "$1" = --help ]; then echo "Usage: wget [-cqS] [-O FILE] URL"; exit 1; fi'
+no_proxy_exit() { printf 'case " $* " in *" --no-proxy "*) exit %s ;; esac' "$1"; }
+
+test_case "runtime: wget bypasses a wgetrc proxy that survives the environment"
+configured_chrome
+stub_cmd pgrep 'echo 4321'
+# The proxy answers 200 for everything; chrome itself is dead. Only --no-proxy
+# reaches the real loopback, so anything else is a false READY.
+stub_cmd wget "$gnu_wget_help; $(no_proxy_exit 4); exit 0"
+out=$(run_preflight)
+assert_kv DEBUG_REACHABLE no "$out"
+assert_status NEEDS_OPT_IN "$out"
+
+test_case "runtime: wget without --no-proxy support still probes via the environment"
+configured_chrome
+stub_cmd pgrep 'echo 4321'
+stub_cmd wget "$busybox_wget_help; $(no_proxy_exit 3); $proxy_sensitive exit 4; fi; exit 0"
+out=$(run_preflight)
+assert_kv DEBUG_REACHABLE yes "$out"
+assert_status READY "$out"
 
 test_case "precedence: an old chrome outranks a missing config"
 stub_cmd uname 'echo Darwin'

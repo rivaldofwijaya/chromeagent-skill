@@ -233,7 +233,12 @@ debug_reachable() {
     return
   fi
   if command -v wget >/dev/null 2>&1; then
-    env $no_proxy_env wget -q -T 2 -O /dev/null "$url" >/dev/null 2>&1
+    # Clearing the environment is not enough for GNU wget: a proxy set in
+    # /etc/wgetrc or ~/.wgetrc overrides the environment. --no-proxy overrides
+    # both, but BusyBox wget rejects it, so pass it only when advertised.
+    wget_direct=''
+    case "$(wget --help 2>&1)" in *--no-proxy*) wget_direct='--no-proxy' ;; esac
+    env $no_proxy_env wget $wget_direct -q -T 2 -O /dev/null "$url" >/dev/null 2>&1
     rc=$?
     case "$rc" in
       0) printf 'yes\n' ;;

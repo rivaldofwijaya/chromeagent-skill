@@ -55,7 +55,10 @@ Applies to a fresh execution and to continuing an execution begun in a previous 
    the result is in hand before the state machine advances. The one permitted concurrency
    is review-alongside-implementation, since review is read-only: freely within an
    already-independent batch, and in a serial chain only when the next task passes rule 5's
-   independence test — hold its diff uncommitted if the earlier review comes back blocking.
+   independence test — hold the next task's diff uncommitted if the earlier review comes
+   back blocking. Review reads, but the worker beside it writes: give the overlapping worker
+   its own worktree (rule 5) and the reviewer a frozen patch (rule 8), or the reviewer is
+   reading a moving tree and its findings are unattributable.
    Dispatch any overlap as one message and await the batch. Do not generalize this into an
    async state machine.
 
@@ -84,11 +87,12 @@ Applies to a fresh execution and to continuing an execution begun in a previous 
 
 8. Review is a separate clean context, and its findings are graded. Code review is its own
    `codex:codex-rescue` dispatch, given only the plan task and the diff, with no
-   implementation history. The worker that wrote a diff never reviews it. The review prompt
-   must classify every finding as blocking (incorrect behavior, deviation from the plan
-   task, missing or fake test, TDD violation, security or data-loss risk) or non-blocking
-   (naming, style, optional refactor). Only blocking findings send the task back; record the
-   rest for branch close.
+   implementation history. Capture that diff as a patch when you dispatch — never point the
+   reviewer at a live `git diff` of a tree that anything else may still write to. The worker
+   that wrote a diff never reviews it. The review prompt must classify every finding as
+   blocking (incorrect behavior, deviation from the plan task, missing or fake test, TDD
+   violation, security or data-loss risk) or non-blocking (naming, style, optional
+   refactor). Only blocking findings send the task back; record the rest for branch close.
 
 9. You own git, and you verify before you commit. You are authorized to create and use
    isolated worktrees without asking, including one per worker for parallel batches. Before

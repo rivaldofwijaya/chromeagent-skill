@@ -293,6 +293,24 @@ and the stable-channel profile path, contradicting §3 of `unconditional-chrome-
 made a non-9222 port file and beta/dev/canary profiles first-class. `references/troubleshooting.md`
 now directs the reader to preflight's own `DEBUG_PORT` and `USER_DATA_DIR`. Landed in `da6a892`.
 
+**2026-08-25 — clearing the environment is not the whole bypass.** The 2026-08-24 amendment above
+chose environment clearing *over* per-tool flags. That reasoning held for BusyBox wget, which still
+rejects `--no-proxy`, but it was incomplete on both platforms:
+
+- GNU wget also reads a proxy from `/etc/wgetrc` and `~/.wgetrc`, and those outrank the environment.
+  A wgetrc proxy therefore answered for Chrome on a host whose environment the probe had just
+  scrubbed. `debug_reachable` now passes `--no-proxy` as well, gated on the build advertising it, so
+  the BusyBox constraint that motivated the original decision is still honoured.
+- Windows PowerShell 5.1's reliance on .NET's `BypassProxyOnLocal` was recorded as untested, and it
+  is a property of the configured proxy rather than a guarantee. `Get-DebugReachable` now nulls
+  `WebRequest.DefaultWebProxy` for the duration of the probe and restores it in `finally`. The
+  PowerShell 7 path is unchanged and still passes `-NoProxy`.
+
+Environment clearing is retained on every POSIX backend; the flags are additive, not a replacement.
+Covered by two cases in `tests/test_preflight.sh`, alongside the direct-loopback cases the
+2026-08-24 amendment added: one stubs a GNU wget whose proxy answers unless `--no-proxy` is
+passed, the other a BusyBox wget that rejects the flag and must still probe via the environment.
+
 **Still open, deliberately.** Two known imprecisions were re-raised on 2026-08-24 and left alone:
 
 - §3.3's residual risk stands — a stale `DevToolsActivePort` plus any squatter answering non-200
