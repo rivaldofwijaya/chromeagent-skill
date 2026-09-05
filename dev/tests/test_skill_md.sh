@@ -106,6 +106,26 @@ skill_assert_fixed 'setup-mcp: codex detected but not configured; run -Agent cod
 skill_assert_fixed 'setup-mcp: codex detected but not configured; run --agent codex to update your global Codex config.' "$readme"
 skill_assert_fixed 'setup-mcp: codex detected but not configured; run -Agent codex to update your global Codex config.' "$readme"
 
+test_case "SKILL.md: setup picks the target for the host it is running in"
+skill=$(cat "$REPO_ROOT/src/SKILL.md")
+table=$(sed -n '/^| STATUS | Do this |$/,/^$/p' "$REPO_ROOT/src/SKILL.md")
+not_configured_row=$(printf '%s\n' "$table" | grep '^| `NOT_CONFIGURED` |')
+skill_assert_fixed 'Pick the setup target for the host you are actually running in' "$not_configured_row"
+skill_assert_fixed '--agent codex' "$not_configured_row"
+skill_assert_fixed 'writes the user'\''s global' "$not_configured_row"
+skill_assert_fixed 'config was just written' "$not_configured_row"
+skill_assert_fixed 'reload/restart the MCP connection' "$not_configured_row"
+skill_assert_fixed 'Codex configuration is global: it applies to every project on the machine, so say that you are writing it before you do.' "$skill"
+skill_assert_fixed 'Setup merges into an existing config rather than replacing it.' "$skill"
+
+test_case "SKILL.md: the host-aware target reaches the channel, path-check, and PowerShell lines"
+skill=$(cat "$REPO_ROOT/src/SKILL.md")
+skill_assert_fixed 'For Claude Code or OpenCode, on POSIX use' "$skill"
+skill_assert_fixed '--agent codex --channel "$CHROME_CHANNEL"' "$skill"
+skill_assert_fixed '-Agent codex -Channel $CHROME_CHANNEL' "$skill"
+skill_assert_fixed '-Agent <target>` for the host-aware setup branch above' "$skill"
+skill_assert_fixed 'For Codex, validate the printed path against `~/.codex/config.toml`' "$skill"
+
 test_case "docs: troubleshooting covers a wrong-directory setup"
 body=$(cat "$REPO_ROOT/src/references/troubleshooting.md")
 skill_assert_fixed '## Config was written to the wrong directory' "$body"
