@@ -135,10 +135,22 @@ You are driving the user's live browser, not a scratch one.
 - Close only tabs you opened. A tab the user already had open is theirs: close it only when the user asks for that tab, and confirm the specific tab first. This is the same rule as the confirm-first entry in §6, not a second one.
 - Leave the browser as you found it: no clearing storage, no signing out, no changing settings as a
   side effect.
+- Pick the tab by what it shows — its title and URL — not by its position in `list_pages`. When
+  more than one tab could be the right one, name the candidates and ask instead of guessing.
+- After any navigation, reload, or action that re-renders the page, take a fresh `take_snapshot` before reusing any element reference. A reference from an earlier snapshot can now point at a
+  different element, or at nothing.
+- Verify the requested outcome from what the page now shows — the URL, the confirmation, the
+  changed row — not from the fact that a tool call returned without error.
 
 ## 6. Action policy: default allow
 
 This is a browser-automation skill. Get work done.
+
+**Authorisation follows the effect, not the mechanism.** Clicking, typing, submitting a form and
+calling `evaluate_script` are all just ways of causing something to happen; what decides the rule
+is what happens to the user's account or to the outside world. A click that publishes is a publication, and a script that posts a request is that request. The two lists below cover the
+ordinary cases — when a control's label, the page state, or the script's own body shows a
+confirm-first effect, it is confirm-first whatever the mechanism.
 
 **Allowed without asking:** navigate, click, hover, drag, type, fill forms, scroll, read
 DOM/console/network, screenshot, `evaluate_script`, performance traces, open new tabs.
@@ -151,9 +163,12 @@ DOM/console/network, screenshot, `evaluate_script`, performance traces, open new
 - closing a tab the user already had open;
 - bulk actions repeated across many items.
 
-Authorisation covers that action and its obvious repeats within the task. It is not a blanket pass
-for the session, and it does not transfer to a different class of risky action. If page state makes
-an allowed action risky in context, such as a "Save" that also publishes, treat it as confirm-first.
+The task the user asked for carries its own authorisation: when they asked you to send the
+message, sending it is the task, not a fresh risk to re-ask about. Confirm-first covers effects
+they have *not* already asked for. Authorisation reaches that action and its obvious repeats within
+the task; it is not a blanket pass for the session and does not transfer to a different class of
+risky action. If page state makes an allowed action risky in context, such as a "Save" that also
+publishes, treat it as confirm-first.
 
 ## 7. Sensitive data
 

@@ -284,3 +284,12 @@ if grep -qF 'Never close a tab the user already had open' "$REPO_ROOT/src/SKILL.
 else
   _ok "no absolute tab prohibition remains"
 fi
+
+test_case "SKILL.md: authorisation follows effect, references are refreshed, outcomes are verified"
+skill=$(cat "$REPO_ROOT/src/SKILL.md")
+skill_assert_fixed 'Authorisation follows the effect, not the mechanism.' "$skill"
+skill_assert_fixed 'A click that publishes is a publication, and a script that posts a request is that request.' "$skill"
+skill_assert_fixed 'The task the user asked for carries its own authorisation' "$skill"
+skill_assert_fixed 'take a fresh `take_snapshot` before reusing any element reference' "$skill"
+skill_assert_fixed 'Pick the tab by what it shows' "$skill"
+skill_assert_fixed 'Verify the requested outcome from what the page now shows' "$skill"
