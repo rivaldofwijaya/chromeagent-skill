@@ -132,7 +132,7 @@ You are driving the user's live browser, not a scratch one.
 - Attach to what exists: `list_pages` → `select_page`. Don't spray new tabs.
 - Prefer `take_snapshot` for reading page structure; screenshot when layout or visual state actually
   matters.
-- Never close a tab the user already had open. Close only tabs you opened.
+- Close only tabs you opened. A tab the user already had open is theirs: close it only when the user asks for that tab, and confirm the specific tab first. This is the same rule as the confirm-first entry in §6, not a second one.
 - Leave the browser as you found it: no clearing storage, no signing out, no changing settings as a
   side effect.
 
@@ -148,7 +148,7 @@ DOM/console/network, screenshot, `evaluate_script`, performance traces, open new
 - irreversible or outward-facing actions (submit a payment, place an order, send an email or
   message, post publicly, invite or remove a user);
 - anything that invalidates the session (logout, revoke tokens, change password);
-- closing tabs the user had open;
+- closing a tab the user already had open;
 - bulk actions repeated across many items.
 
 Authorisation covers that action and its obvious repeats within the task. It is not a blanket pass

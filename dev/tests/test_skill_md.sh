@@ -142,7 +142,7 @@ assert_contains 'Confirm first' "$action"
 assert_contains 'deleting or destroying' "$action"
 assert_contains 'irreversible or outward-facing' "$action"
 assert_contains 'invalidates the session' "$action"
-assert_contains 'closing tabs the user had open' "$action"
+assert_contains 'closing a tab the user already had open' "$action"
 assert_contains 'bulk actions repeated across many items' "$action"
 
 test_case "docs: README states the supported agents and requirements"
@@ -273,3 +273,14 @@ table=$(sed -n '/^| STATUS | Do this |$/,/^$/p' "$skill")
 node_row=$(printf '%s\n' "$table" | grep '^| `NODE_MISSING` |')
 skill_assert_fixed 'open a **new** terminal (or refresh `PATH`) before re-probing' "$node_row"
 skill_assert_fixed 'still has the pre-install `PATH`' "$node_row"
+
+test_case "SKILL.md: one consistent rule for pre-existing tabs"
+skill=$(cat "$REPO_ROOT/src/SKILL.md")
+skill_assert_fixed 'Close only tabs you opened.' "$skill"
+skill_assert_fixed 'A tab the user already had open is theirs: close it only when the user asks for that tab, and confirm the specific tab first.' "$skill"
+skill_assert_fixed 'closing a tab the user already had open' "$skill"
+if grep -qF 'Never close a tab the user already had open' "$REPO_ROOT/src/SKILL.md"; then
+  _fail "the absolute prohibition still contradicts the confirm-first entry"
+else
+  _ok "no absolute tab prohibition remains"
+fi
