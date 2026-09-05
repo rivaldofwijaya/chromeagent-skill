@@ -124,7 +124,7 @@ skill_assert_fixed 'For Claude Code or OpenCode, on POSIX use' "$skill"
 skill_assert_fixed '--agent codex --channel "$CHROME_CHANNEL"' "$skill"
 skill_assert_fixed '-Agent codex -Channel $CHROME_CHANNEL' "$skill"
 skill_assert_fixed '-Agent <target>` for the host-aware setup branch above' "$skill"
-skill_assert_fixed 'For Codex, validate the printed path against `~/.codex/config.toml`' "$skill"
+skill_assert_fixed 'For Codex there is no printed path to check: success is the line `setup-mcp: registered chrome-devtools with the Codex CLI` and exit 0' "$skill"
 
 test_case "docs: troubleshooting covers a wrong-directory setup"
 body=$(cat "$REPO_ROOT/src/references/troubleshooting.md")
