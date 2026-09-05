@@ -1,3 +1,4 @@
+# shellcheck shell=sh
 skill_assert_fixed() {
   if printf '%s\n' "$2" | grep -F -q -- "$1"; then _ok "contains '$1'"
   else _fail "missing '$1' in output"; fi

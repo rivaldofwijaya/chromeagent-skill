@@ -1,3 +1,4 @@
+# shellcheck shell=sh
 test_case "platform: macos is detected from uname"
 stub_cmd uname 'echo Darwin'
 out=$(run_preflight)

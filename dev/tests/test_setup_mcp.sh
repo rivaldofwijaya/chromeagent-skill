@@ -1,3 +1,4 @@
+# shellcheck shell=sh
 assert_setup_rc() {
   expected="$1"
   actual="$2"

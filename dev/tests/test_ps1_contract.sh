@@ -1,3 +1,4 @@
+# shellcheck shell=sh
 if ! host_tool_path pwsh >/dev/null 2>&1; then
   printf 'skip test_ps1_contract.sh — pwsh not installed\n'
 else
