@@ -36,17 +36,31 @@ jobs:
       - name: Lint POSIX shell
         run: shellcheck -S error src/scripts/*.sh dev/tests/*.sh
 
-  powershell:
-    name: powershell parse (${{ matrix.shell }})
+  # `shell:` takes no expression, so the two shells are separate jobs rather
+  # than a matrix leg. Keep the two run blocks identical.
+  powershell-pwsh:
+    name: powershell parse (pwsh)
     runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        shell: [pwsh, powershell]
     steps:
       - uses: actions/checkout@v7
       - name: Parse the PowerShell scripts
         shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Get-ChildItem src/scripts -Filter *.ps1 | ForEach-Object {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errors) | Out-Null
+            if ($errors) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
+            Write-Host "ok $($_.Name)"
+          }
+
+  powershell-desktop:
+    name: powershell parse (powershell)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Parse the PowerShell scripts
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           Get-ChildItem src/scripts -Filter *.ps1 | ForEach-Object {
