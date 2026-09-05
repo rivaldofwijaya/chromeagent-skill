@@ -326,6 +326,8 @@ log=$(cat "$HOME/codex.log")
 assert_contains 'CODEX_CALLED mcp add' "$log"
 assert_contains 'autoConnect' "$log"
 assert_contains 'global' "$out"
+# SKILL.md tells a Codex user this exact line is the success signal, since no path is printed.
+assert_contains 'setup-mcp: registered chrome-devtools with the Codex CLI' "$out"
 
 test_case "setup codex: prints the command when the CLI is absent"
 stub_cmd uname 'echo Darwin'

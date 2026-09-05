@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Run `sh scripts/preflight.sh` (or `pwsh -File scripts/preflight.ps1`) and match the `STATUS=` line.
+Run `sh /path/to/chromeagent-skill/scripts/preflight.sh` (or `pwsh -File /path/to/chromeagent-skill/scripts/preflight.ps1`) from the project root and match the `STATUS=` line.
 Preflight emits a verdict and exits 0; use `STATUS`, not the process exit code.
 
 ## `NODE_MISSING`
@@ -61,7 +61,7 @@ other existing-file setup failures on Windows also exit 3.
 
 Fix: preserve a copy of the existing file, repair its JSON or permissions, then rerun setup. On
 POSIX without Node, merge the printed `chrome-devtools` entry by hand, or install Node and rerun.
-On Windows, rerun `pwsh -File scripts/setup-mcp.ps1 -Agent auto` after repairing the file. Exit 3 is a setup failure on either platform; it is not only the manual-merge case. Restart the agent after
+On Windows, rerun `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent <target>` after repairing the file, with the same host-aware target as the `NOT_CONFIGURED` section above: `auto` for Claude Code or OpenCode, `codex` for Codex. Exit 3 is a setup failure on either platform; it is not only the manual-merge case. Restart the agent after
 a successful setup.
 
 ## `CHROME_NOT_RUNNING`

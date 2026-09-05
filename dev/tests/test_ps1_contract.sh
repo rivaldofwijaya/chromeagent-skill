@@ -348,6 +348,8 @@ mkdir "$out_dir"
 out=$(run_setup_ps1 -Agent codex -OutDir "$out_dir")
 rc=$?
 if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
+# SKILL.md tells a Codex user this exact line is the success signal, since no path is printed.
+assert_contains 'setup-mcp: registered chrome-devtools with the Codex CLI' "$out"
 if [ ! -e "$out_dir/.mcp.json" ] && [ ! -e "$out_dir/opencode.json" ]; then
   _ok "output directory was not used by codex"
 else

@@ -41,6 +41,10 @@ Set-Location /path/to/your/project
 pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto
 ```
 
+`--agent auto` (or `-Agent auto`) targets the project-scoped agents only; if the host you are
+setting up is the Codex CLI, run the same command with `--agent codex` (or `-Agent codex`),
+which writes your global `~/.codex/config.toml`.
+
 Restart your agent afterwards. MCP config is read at startup.
 
 Both setup scripts resolve paths relative to the current working directory, so run them from the project root; the skill's own directory is never the right place. Invoke the scripts by their absolute path from the project-root shell. If the working directory cannot be the project root, pass `--out-dir "<dir>"` (or `-OutDir "<dir>"`) as the explicit output override. Preflight scans config paths relative to its own current working directory and has no `--out-dir`/`-OutDir` override. If setup writes elsewhere, run preflight from that output directory; otherwise it reports `NOT_CONFIGURED` even though the config exists.
@@ -49,7 +53,7 @@ Both setup scripts resolve paths relative to the current working directory, so r
 
 For `auto`, markers in the resolved output directory select the project target: `.mcp.json` or `.claude/` selects Claude Code, and `opencode.json` selects OpenCode. With no marker, `auto` falls back to Claude Code. It never writes Codex's global config. When Codex is present, POSIX prints `setup-mcp: codex detected but not configured; run --agent codex to update your global Codex config.` and PowerShell prints `setup-mcp: codex detected but not configured; run -Agent codex to update your global Codex config.`
 
-A successful setup prints the absolute path it wrote; check that path against the project root. `--out-dir` and `-OutDir` require an existing directory; neither script creates it.
+For project targets: a successful setup prints the absolute path it wrote; check that path against the project root. For Codex there is no printed path to check: success is the line `setup-mcp: registered chrome-devtools with the Codex CLI` and exit 0, and the file written is `~/.codex/config.toml`, not the project root; the output override does not change its global scope. `--out-dir` and `-OutDir` require an existing directory; neither script creates it.
 
 The help output is:
 

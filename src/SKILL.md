@@ -132,7 +132,7 @@ You are driving the user's live browser, not a scratch one.
 - Attach to what exists: `list_pages` → `select_page`. Don't spray new tabs.
 - Prefer `take_snapshot` for reading page structure; screenshot when layout or visual state actually
   matters.
-- Close only tabs you opened. A tab the user already had open is theirs: close it only when the user asks for that tab, and confirm the specific tab first. This is the same rule as the confirm-first entry in §6, not a second one.
+- Close only tabs you opened. A tab the user already had open is theirs: close it only when the user asks for that tab, and name the tab you are closing so they can stop you if it is the wrong one. §6's confirm-first entry is how you obtain that request when the user has not already made it; this bullet says which tab the rule is about, not a second gate.
 - Leave the browser as you found it: no clearing storage, no signing out, no changing settings as a
   side effect.
 - Pick the tab by what it shows — its title and URL — not by its position in `list_pages`. When
@@ -163,11 +163,12 @@ DOM/console/network, screenshot, `evaluate_script`, performance traces, open new
 - closing a tab the user already had open;
 - bulk actions repeated across many items.
 
-The task the user asked for carries its own authorisation: when they asked you to send the
-message, sending it is the task, not a fresh risk to re-ask about. Confirm-first covers effects
-they have *not* already asked for. Authorisation reaches that action and its obvious repeats within
-the task; it is not a blanket pass for the session and does not transfer to a different class of
-risky action. If page state makes an allowed action risky in context, such as a "Save" that also
+A request that names the effect carries its own authorisation: when they asked you to send *that*
+message, sending it is the task, not a fresh risk to re-ask about. A request that names only a goal
+— "clean up my inbox", "get my order through" — does not name the deletions, the payment, or the
+bulk repetition that reaching it would take, so each of those stays confirm-first. Authorisation
+reaches the named action and its obvious repeats within the task; it is not a blanket pass for the
+session and does not transfer to a different class of risky action. If page state makes an allowed action risky in context, such as a "Save" that also
 publishes, treat it as confirm-first.
 
 ## 7. Sensitive data
