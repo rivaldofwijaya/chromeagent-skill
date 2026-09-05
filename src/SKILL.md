@@ -22,7 +22,7 @@ nothing has changed.
 
 ## 2. Preflight
 
-Both setup scripts resolve paths relative to the current working directory, so run them from the project root; the skill's own directory is never the right place. Invoke the scripts by their absolute path from the project-root shell. If the working directory cannot be the project root, use `--out-dir <dir>` (or `-OutDir <dir>`) as the explicit output override. Preflight scans config paths relative to its own current working directory and has no `--out-dir`/`-OutDir` override. If setup writes elsewhere, run preflight from that output directory; otherwise it reports `NOT_CONFIGURED` even though the config exists.
+For project-scoped targets, the following working-directory rule applies. Both setup scripts resolve paths relative to the current working directory, so run them from the project root; the skill's own directory is never the right place. Invoke the scripts by their absolute path from the project-root shell. If the working directory cannot be the project root, use `--out-dir <dir>` (or `-OutDir <dir>`) as the explicit output override. Preflight scans config paths relative to its own current working directory and has no `--out-dir`/`-OutDir` override. If setup writes elsewhere, run preflight from that output directory; otherwise it reports `NOT_CONFIGURED` even though the config exists.
 
 Replace the placeholder paths below with your project root and the installed skill directory.
 
@@ -62,7 +62,7 @@ Read the `STATUS` and branch. Verdict precedence is first failing check wins: `N
 | STATUS | Do this |
 |---|---|
 | `READY` | If the `chrome-devtools` tools are present, say nothing: `list_pages` → `select_page` → the user's task. If the tools are absent, do not call `list_pages` yet: the config may have just been written, so reload/restart the MCP connection, wait for the tools to appear, then continue. |
-| `NOT_CONFIGURED` | Run `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto` on POSIX or `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto` on native Windows without asking. The command writes into the current working directory, which must be the project root unless an explicit output directory is supplied. On successful setup the config was just written; reload/restart the MCP connection before calling any tool, because MCP config is read at startup. |
+| `NOT_CONFIGURED` | Pick the setup target for the host you are actually running in, then run setup without asking. Under Claude Code or OpenCode use `--agent auto` (`-Agent auto`), which reads markers in the output directory to choose between them. Under Codex use `--agent codex` (`-Agent codex`), which writes the user's global `~/.codex/config.toml`; `auto` never writes it, so following the `auto` branch under Codex configures a consumer that is not running. POSIX: `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent <target>`; native Windows: `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent <target>`. Under `auto` the command writes into the current working directory, which must be the project root unless an explicit output directory is supplied; under `codex` it ignores both the working directory and the output override and writes the global file. On successful setup the config was just written; reload/restart the MCP connection before calling any tool, because MCP config is read at startup. |
 | `NEEDS_OPT_IN` | Stop. One instruction: "Open `chrome://inspect/#remote-debugging` in Chrome and click Allow." Then re-run preflight. |
 | `CHROME_NOT_RUNNING` | Ask the user to open Chrome normally, then re-run preflight. |
 | `CHROME_TOO_OLD` | Report the actual `CHROME_VERSION` found and that `--autoConnect` needs Chrome 144+. Offer the fallbacks below as an explicit choice. |
@@ -73,15 +73,17 @@ Read the `STATUS` and branch. Verdict precedence is first failing check wins: `N
 `chrome-devtools-mcp` runner. If one of those is available, preflight reports that runner instead.
 
 If preflight reports `CHROME_CHANNEL` as `beta`, `dev`, or `canary`, pass that exact reported value through.
-On POSIX use `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto --channel "$CHROME_CHANNEL"`;
+For Claude Code or OpenCode, on POSIX use `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto --channel "$CHROME_CHANNEL"`;
 on native Windows use `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto -Channel $CHROME_CHANNEL`.
+Under Codex use `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent codex --channel "$CHROME_CHANNEL"`
+or `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent codex -Channel $CHROME_CHANNEL`.
 A non-stable Chrome keeps its
 profile in a different directory and `--autoConnect` must be told which one. Omit the channel flag for
 `stable`.
 
 The POSIX setup CLI accepts agents `auto|claude|codex|opencode`, plus `--runner "<argv>"`,
 `--channel beta|dev|canary`, `--out-dir <dir>`, and `--no-redact`. The native PowerShell spelling is `-Agent`, `-Runner`, `-Channel`, and `-NoRedact`; add `-OutDir <dir>` for the output-directory override. It accepts the same three channel values. On native Windows, use
-`pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto` for the setup branch above. Both setup CLIs use exit 0
+`pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent <target>` for the host-aware setup branch above. Both setup CLIs use exit 0
 for success and exit 2 for bad usage or invalid agent/channel values. Exit 3 is a setup failure on
 either platform, not a preflight verdict and not synonymous with manual merge.
 
@@ -95,7 +97,9 @@ The help output is:
 
 For `auto`, markers in the resolved output directory select the project target: `.mcp.json` or `.claude/` selects Claude Code, and `opencode.json` selects OpenCode. With no marker, `auto` falls back to Claude Code. It never writes Codex's global config. When Codex is present, POSIX prints `setup-mcp: codex detected but not configured; run --agent codex to update your global Codex config.` and PowerShell prints `setup-mcp: codex detected but not configured; run -Agent codex to update your global Codex config.`
 
-A successful setup prints the absolute path it wrote; check that path against the project root. `--out-dir` and `-OutDir` require an existing directory; neither script creates it.
+Codex configuration is global: it applies to every project on the machine, so say that you are writing it before you do. Setup merges into an existing config rather than replacing it. For the POSIX existing-JSON/no-Node case described below, hand the manual-merge snippet to the user rather than overwriting the file to get past it. Other exit-3 failures need diagnosis; they do not promise a snippet.
+
+For project targets: A successful setup prints the absolute path it wrote; check that path against the project root. For Codex there is no printed path to check: success is the line `setup-mcp: registered chrome-devtools with the Codex CLI` and exit 0, and the file written is `~/.codex/config.toml`, not the project root; the output override does not change its global scope. `--out-dir` and `-OutDir` require an existing directory; neither script creates it.
 
 The setup defaults are exactly `--autoConnect`, `--redactNetworkHeaders`, in that order;
 `--no-redact` (or `-NoRedact`) drops the redaction flag, and a channel flag follows those defaults.
@@ -128,13 +132,25 @@ You are driving the user's live browser, not a scratch one.
 - Attach to what exists: `list_pages` → `select_page`. Don't spray new tabs.
 - Prefer `take_snapshot` for reading page structure; screenshot when layout or visual state actually
   matters.
-- Never close a tab the user already had open. Close only tabs you opened.
+- Close only tabs you opened. A tab the user already had open is theirs: close it only when the user asks for that tab, and name the tab you are closing so they can stop you if it is the wrong one. §6's confirm-first entry is how you obtain that request when the user has not already made it; this bullet says which tab the rule is about, not a second gate.
 - Leave the browser as you found it: no clearing storage, no signing out, no changing settings as a
   side effect.
+- Pick the tab by what it shows — its title and URL — not by its position in `list_pages`. When
+  more than one tab could be the right one, name the candidates and ask instead of guessing.
+- After any navigation, reload, or action that re-renders the page, take a fresh `take_snapshot` before reusing any element reference. A reference from an earlier snapshot can now point at a
+  different element, or at nothing.
+- Verify the requested outcome from what the page now shows — the URL, the confirmation, the
+  changed row — not from the fact that a tool call returned without error.
 
 ## 6. Action policy: default allow
 
 This is a browser-automation skill. Get work done.
+
+**Authorisation follows the effect, not the mechanism.** Clicking, typing, submitting a form and
+calling `evaluate_script` are all just ways of causing something to happen; what decides the rule
+is what happens to the user's account or to the outside world. A click that publishes is a publication, and a script that posts a request is that request. The two lists below cover the
+ordinary cases — when a control's label, the page state, or the script's own body shows a
+confirm-first effect, it is confirm-first whatever the mechanism.
 
 **Allowed without asking:** navigate, click, hover, drag, type, fill forms, scroll, read
 DOM/console/network, screenshot, `evaluate_script`, performance traces, open new tabs.
@@ -144,12 +160,16 @@ DOM/console/network, screenshot, `evaluate_script`, performance traces, open new
 - irreversible or outward-facing actions (submit a payment, place an order, send an email or
   message, post publicly, invite or remove a user);
 - anything that invalidates the session (logout, revoke tokens, change password);
-- closing tabs the user had open;
+- closing a tab the user already had open;
 - bulk actions repeated across many items.
 
-Authorisation covers that action and its obvious repeats within the task. It is not a blanket pass
-for the session, and it does not transfer to a different class of risky action. If page state makes
-an allowed action risky in context, such as a "Save" that also publishes, treat it as confirm-first.
+A request that names the effect carries its own authorisation: when they asked you to send *that*
+message, sending it is the task, not a fresh risk to re-ask about. A request that names only a goal
+— "clean up my inbox", "get my order through" — does not name the deletions, the payment, or the
+bulk repetition that reaching it would take, so each of those stays confirm-first. Authorisation
+reaches the named action and its obvious repeats within the task; it is not a blanket pass for the
+session and does not transfer to a different class of risky action. If page state makes an allowed action risky in context, such as a "Save" that also
+publishes, treat it as confirm-first.
 
 ## 7. Sensitive data
 

@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Run `sh scripts/preflight.sh` (or `pwsh -File scripts/preflight.ps1`) and match the `STATUS=` line.
+Run `sh /path/to/chromeagent-skill/scripts/preflight.sh` (or `pwsh -File /path/to/chromeagent-skill/scripts/preflight.ps1`) from the project root and match the `STATUS=` line.
 Preflight emits a verdict and exits 0; use `STATUS`, not the process exit code.
 
 ## `NODE_MISSING`
@@ -12,7 +12,7 @@ No `npx`, `bunx`, `pnpm`, or global `chrome-devtools-mcp`.
 - Linux: your distro package, or `nvm install --lts`
 
 Then re-run preflight. If you cannot install Node, `bunx` or `pnpm dlx` work:
-`sh scripts/setup-mcp.sh --agent auto --runner "bunx"`.
+For Claude Code or OpenCode use `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto --runner "bunx"`; under Codex use `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent codex --runner "bunx"`, which writes global `~/.codex/config.toml`.
 
 ## `CHROME_MISSING`
 
@@ -34,9 +34,8 @@ Update Chrome (Menu → Help → About Google Chrome), or use a fallback:
 
 ## `NOT_CONFIGURED`
 
-No `chrome-devtools` entry with `--autoConnect` in any scanned config. Run
-`sh scripts/setup-mcp.sh --agent auto`, then **restart your agent**. MCP config is read at startup.
-On native Windows, use `pwsh -File scripts/setup-mcp.ps1 -Agent auto` instead.
+No `chrome-devtools` entry with `--autoConnect` in any scanned config. Choose the target for the current host: `auto` for Claude Code or OpenCode, `codex` for Codex. Codex writes global `~/.codex/config.toml`; announce that scope before setup. Run `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent <target>`, then **restart your agent**. MCP config is read at startup.
+On native Windows, use `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent <target>` instead. Pass any reported beta/dev/canary channel as described in SKILL.md.
 
 Scanned, in order: `./.mcp.json`, `./.vscode/mcp.json`, `./.cursor/mcp.json`, `./opencode.json`,
 `./.codex/config.toml`, `~/.codex/config.toml`, `~/.config/opencode/opencode.json`.
@@ -62,7 +61,7 @@ other existing-file setup failures on Windows also exit 3.
 
 Fix: preserve a copy of the existing file, repair its JSON or permissions, then rerun setup. On
 POSIX without Node, merge the printed `chrome-devtools` entry by hand, or install Node and rerun.
-On Windows, rerun `pwsh -File scripts/setup-mcp.ps1 -Agent auto` after repairing the file. Exit 3 is a setup failure on either platform; it is not only the manual-merge case. Restart the agent after
+On Windows, rerun `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent <target>` after repairing the file, with the same host-aware target as the `NOT_CONFIGURED` section above: `auto` for Claude Code or OpenCode, `codex` for Codex. Exit 3 is a setup failure on either platform; it is not only the manual-merge case. Restart the agent after
 a successful setup.
 
 ## `CHROME_NOT_RUNNING`

@@ -92,6 +92,10 @@ skill_assert_fixed 'Invoke the scripts by their absolute path from the project-r
 skill_assert_fixed 'use `--out-dir <dir>` (or `-OutDir <dir>`) as the explicit output override' "$skill"
 skill_assert_fixed "$auto_sentence" "$skill"
 skill_assert_fixed 'A successful setup prints the absolute path it wrote; check that path against the project root.' "$skill"
+skill_assert_fixed 'For project targets: a successful setup prints the absolute path it wrote; check that path against the project root.' "$readme"
+skill_assert_fixed 'For Codex there is no printed path to check: success is the line `setup-mcp: registered chrome-devtools with the Codex CLI` and exit 0' "$readme"
+skill_assert_fixed 'if the host you are' "$readme"
+skill_assert_fixed 'setting up is the Codex CLI, run the same command with `--agent codex` (or `-Agent codex`),' "$readme"
 skill_assert_fixed 'usage: setup-mcp.sh --agent auto|claude|codex|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact]' "$skill"
 skill_assert_fixed 'usage: setup-mcp.ps1 -Agent auto|claude|codex|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact]' "$skill"
 skill_assert_fixed "$cwd_sentence" "$readme"
@@ -106,9 +110,53 @@ skill_assert_fixed 'setup-mcp: codex detected but not configured; run -Agent cod
 skill_assert_fixed 'setup-mcp: codex detected but not configured; run --agent codex to update your global Codex config.' "$readme"
 skill_assert_fixed 'setup-mcp: codex detected but not configured; run -Agent codex to update your global Codex config.' "$readme"
 
+test_case "SKILL.md: setup picks the target for the host it is running in"
+skill=$(cat "$REPO_ROOT/src/SKILL.md")
+table=$(sed -n '/^| STATUS | Do this |$/,/^$/p' "$REPO_ROOT/src/SKILL.md")
+not_configured_row=$(printf '%s\n' "$table" | grep '^| `NOT_CONFIGURED` |')
+skill_assert_fixed 'Pick the setup target for the host you are actually running in' "$not_configured_row"
+skill_assert_fixed '--agent codex' "$not_configured_row"
+skill_assert_fixed 'writes the user'\''s global' "$not_configured_row"
+skill_assert_fixed 'config was just written' "$not_configured_row"
+skill_assert_fixed 'reload/restart the MCP connection' "$not_configured_row"
+skill_assert_fixed 'Codex configuration is global: it applies to every project on the machine, so say that you are writing it before you do.' "$skill"
+skill_assert_fixed 'Setup merges into an existing config rather than replacing it.' "$skill"
+
+test_case "SKILL.md: the host-aware target reaches the channel, path-check, and PowerShell lines"
+skill=$(cat "$REPO_ROOT/src/SKILL.md")
+skill_assert_fixed 'For Claude Code or OpenCode, on POSIX use' "$skill"
+skill_assert_fixed '--agent codex --channel "$CHROME_CHANNEL"' "$skill"
+skill_assert_fixed '-Agent codex -Channel $CHROME_CHANNEL' "$skill"
+skill_assert_fixed '-Agent <target>` for the host-aware setup branch above' "$skill"
+skill_assert_fixed 'For Codex there is no printed path to check: success is the line `setup-mcp: registered chrome-devtools with the Codex CLI` and exit 0' "$skill"
+
 test_case "docs: troubleshooting covers a wrong-directory setup"
 body=$(cat "$REPO_ROOT/src/references/troubleshooting.md")
 skill_assert_fixed '## Config was written to the wrong directory' "$body"
+skill_assert_fixed '`auto` does not configure Codex; use the explicit `--agent codex` (or `-Agent codex`) for the user'"'"'s global Codex config.' "$body"
+
+test_case "docs: troubleshooting picks the setup target for the host it is running in"
+body=$(cat "$REPO_ROOT/src/references/troubleshooting.md")
+for expected in \
+  'Choose the target for the current host: `auto` for Claude Code or OpenCode, `codex` for Codex.' \
+  'Codex writes global `~/.codex/config.toml`; announce that scope before setup.' \
+  'Run `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent <target>`' \
+  'On native Windows, use `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent <target>` instead.' \
+  'under Codex use `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent codex --runner "bunx"`' \
+  'On Windows, rerun `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent <target>` after repairing the file' \
+  'with the same host-aware target as the `NOT_CONFIGURED` section above: `auto` for Claude Code or OpenCode, `codex` for Codex.'; do
+  skill_assert_fixed "$expected" "$body"
+done
+# No remediation step may hand a Codex user an unconditional `auto`: every line that
+# prescribes an `auto` invocation must name the codex alternative on the same line.
+unconditional=$(printf '%s\n' "$body" \
+  | grep -F -e 'setup-mcp.sh --agent auto' -e 'setup-mcp.ps1 -Agent auto' \
+  | grep -F -v -- 'codex')
+if [ -n "$unconditional" ]; then
+  _fail "troubleshooting.md prescribes an unconditional target: $unconditional"
+else
+  _ok "every troubleshooting.md auto invocation names the codex alternative"
+fi
 
 test_case "SKILL.md: names both script flavours and the confirm-first policy"
 skill="$REPO_ROOT/src/SKILL.md"
@@ -122,7 +170,7 @@ assert_contains 'Confirm first' "$action"
 assert_contains 'deleting or destroying' "$action"
 assert_contains 'irreversible or outward-facing' "$action"
 assert_contains 'invalidates the session' "$action"
-assert_contains 'closing tabs the user had open' "$action"
+assert_contains 'closing a tab the user already had open' "$action"
 assert_contains 'bulk actions repeated across many items' "$action"
 
 test_case "docs: README states the supported agents and requirements"
@@ -228,6 +276,7 @@ skill=$(cat "$REPO_ROOT/src/SKILL.md")
 readme=$(cat "$REPO_ROOT/README.md")
 # A bare relative path fails from the project root, because scripts/ lives under
 # the installed skill directory and preflight must run in the project.
+troubleshooting=$(cat "$REPO_ROOT/src/references/troubleshooting.md")
 for bare in \
   'sh scripts/setup-mcp.sh' \
   'pwsh -File scripts/setup-mcp.ps1' \
@@ -243,6 +292,11 @@ for bare in \
   else
     _ok "README.md has no bare '$bare'"
   fi
+  if printf '%s\n' "$troubleshooting" | grep -F -q -- "$bare"; then
+    _fail "troubleshooting.md has a bare relative invocation: $bare"
+  else
+    _ok "troubleshooting.md has no bare '$bare'"
+  fi
 done
 skill_assert_fixed 'sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto' "$skill"
 skill_assert_fixed 'pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto' "$skill"
@@ -253,3 +307,28 @@ table=$(sed -n '/^| STATUS | Do this |$/,/^$/p' "$skill")
 node_row=$(printf '%s\n' "$table" | grep '^| `NODE_MISSING` |')
 skill_assert_fixed 'open a **new** terminal (or refresh `PATH`) before re-probing' "$node_row"
 skill_assert_fixed 'still has the pre-install `PATH`' "$node_row"
+
+test_case "SKILL.md: one consistent rule for pre-existing tabs"
+skill=$(cat "$REPO_ROOT/src/SKILL.md")
+skill_assert_fixed 'Close only tabs you opened.' "$skill"
+skill_assert_fixed 'A tab the user already had open is theirs: close it only when the user asks for that tab, and name the tab you are closing so they can stop you if it is the wrong one.' "$skill"
+skill_assert_fixed "this bullet says which tab the rule is about, not a second gate" "$skill"
+skill_assert_fixed 'closing a tab the user already had open' "$skill"
+if grep -qF 'Never close a tab the user already had open' "$REPO_ROOT/src/SKILL.md"; then
+  _fail "the absolute prohibition still contradicts the confirm-first entry"
+else
+  _ok "no absolute tab prohibition remains"
+fi
+
+test_case "SKILL.md: authorisation follows effect, references are refreshed, outcomes are verified"
+skill=$(cat "$REPO_ROOT/src/SKILL.md")
+skill_assert_fixed 'Authorisation follows the effect, not the mechanism.' "$skill"
+skill_assert_fixed 'A click that publishes is a publication, and a script that posts a request is that request.' "$skill"
+skill_assert_fixed 'A request that names the effect carries its own authorisation' "$skill"
+skill_assert_fixed 'does not name the deletions, the payment, or the' "$skill"
+skill_assert_fixed 'bulk repetition that reaching it would take, so each of those stays confirm-first.' "$skill"
+skill_assert_fixed 'it is not a blanket pass for the' "$skill"
+skill_assert_fixed 'session and does not transfer to a different class of risky action.' "$skill"
+skill_assert_fixed 'take a fresh `take_snapshot` before reusing any element reference' "$skill"
+skill_assert_fixed 'Pick the tab by what it shows' "$skill"
+skill_assert_fixed 'Verify the requested outcome from what the page now shows' "$skill"
