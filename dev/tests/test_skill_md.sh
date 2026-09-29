@@ -68,8 +68,8 @@ skill_assert_fixed 'preflight always exits 0' "$signal"
 skill_assert_fixed '`STATUS` value is the signal; never branch on preflight' "$signal"
 skill_assert_fixed '`--autoConnect` needs Chrome 144+' "$body"
 
-test_case "SKILL.md: documents platform setup flags, channels, and exit failures"
-skill="$REPO_ROOT/src/SKILL.md"
+test_case "setup.md: documents platform setup flags, channels, and exit failures"
+skill="$REPO_ROOT/src/references/setup.md"
 body=$(cat "$skill")
 skill_assert_fixed 'sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto --channel "$CHROME_CHANNEL"' "$body"
 skill_assert_fixed 'pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto -Channel $CHROME_CHANNEL' "$body"
@@ -85,20 +85,21 @@ skill_assert_fixed 'does not use the sh manual-merge branch' "$body"
 
 test_case "docs: documents the cwd contract, output directory, and auto scope"
 skill=$(cat "$REPO_ROOT/src/SKILL.md")
+setup=$(cat "$REPO_ROOT/src/references/setup.md")
 readme=$(cat "$REPO_ROOT/README.md")
 cwd_sentence="Both setup scripts resolve paths relative to the current working directory, so run them from the project root; the skill's own directory is never the right place."
 auto_sentence='`auto` configures project-scoped agents only (Claude Code and OpenCode); Codex requires an explicit `--agent codex` and writes the user'\''s global `~/.codex/config.toml`.'
 skill_assert_fixed "$cwd_sentence" "$skill"
 skill_assert_fixed 'Invoke the scripts by their absolute path from the project-root shell.' "$skill"
 skill_assert_fixed 'use `--out-dir <dir>` (or `-OutDir <dir>`) as the explicit output override' "$skill"
-skill_assert_fixed "$auto_sentence" "$skill"
-skill_assert_fixed 'A successful setup prints the absolute path it wrote; check that path against the project root.' "$skill"
+skill_assert_fixed "$auto_sentence" "$setup"
+skill_assert_fixed 'A successful setup prints the absolute path it wrote; check that path against the project root.' "$setup"
 skill_assert_fixed 'For project targets: a successful setup prints the absolute path it wrote; check that path against the project root.' "$readme"
 skill_assert_fixed 'For Codex there is no printed path to check: success is the line `setup-mcp: registered chrome-devtools with the Codex CLI` and exit 0' "$readme"
 skill_assert_fixed 'if the host you are' "$readme"
 skill_assert_fixed 'setting up is the Codex CLI, run the same command with `--agent codex` (or `-Agent codex`),' "$readme"
-skill_assert_fixed 'usage: setup-mcp.sh --agent auto|claude|codex|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact]' "$skill"
-skill_assert_fixed 'usage: setup-mcp.ps1 -Agent auto|claude|codex|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact]' "$skill"
+skill_assert_fixed 'usage: setup-mcp.sh --agent auto|claude|codex|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact]' "$setup"
+skill_assert_fixed 'usage: setup-mcp.ps1 -Agent auto|claude|codex|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact]' "$setup"
 skill_assert_fixed "$cwd_sentence" "$readme"
 skill_assert_fixed 'Invoke the scripts by their absolute path from the project-root shell.' "$readme"
 skill_assert_fixed 'Flags: `--runner "<argv>"`, `--channel beta|dev|canary`, `--out-dir "<dir>"`, `--no-redact`' "$readme"
@@ -106,8 +107,8 @@ skill_assert_fixed 'PowerShell: `-Runner "<argv>"`, `-Channel beta|dev|canary`, 
 skill_assert_fixed "$auto_sentence" "$readme"
 skill_assert_fixed 'usage: setup-mcp.sh --agent auto|claude|codex|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact]' "$readme"
 skill_assert_fixed 'usage: setup-mcp.ps1 -Agent auto|claude|codex|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact]' "$readme"
-skill_assert_fixed 'setup-mcp: codex detected but not configured; run --agent codex to update your global Codex config.' "$skill"
-skill_assert_fixed 'setup-mcp: codex detected but not configured; run -Agent codex to update your global Codex config.' "$skill"
+skill_assert_fixed 'setup-mcp: codex detected but not configured; run --agent codex to update your global Codex config.' "$setup"
+skill_assert_fixed 'setup-mcp: codex detected but not configured; run -Agent codex to update your global Codex config.' "$setup"
 skill_assert_fixed 'setup-mcp: codex detected but not configured; run --agent codex to update your global Codex config.' "$readme"
 skill_assert_fixed 'setup-mcp: codex detected but not configured; run -Agent codex to update your global Codex config.' "$readme"
 
@@ -120,15 +121,18 @@ skill_assert_fixed '--agent codex' "$not_configured_row"
 skill_assert_fixed 'writes the user'\''s global' "$not_configured_row"
 skill_assert_fixed 'config was just written' "$not_configured_row"
 skill_assert_fixed 'reload/restart the MCP connection' "$not_configured_row"
-skill_assert_fixed 'Codex configuration is global: it applies to every project on the machine, so say that you are writing it before you do.' "$skill"
-skill_assert_fixed 'Setup merges into an existing config rather than replacing it.' "$skill"
+setup=$(cat "$REPO_ROOT/src/references/setup.md")
+skill_assert_fixed 'Codex configuration is global: it applies to every project on the machine, so say that you are writing it before you do.' "$setup"
+skill_assert_fixed 'Setup merges into an existing config rather than replacing it.' "$setup"
+skill_assert_fixed 'say so before running it' "$not_configured_row"
+skill_assert_fixed 'read `references/setup.md` first' "$not_configured_row"
 
-test_case "SKILL.md: the host-aware target reaches the channel, path-check, and PowerShell lines"
-skill=$(cat "$REPO_ROOT/src/SKILL.md")
+test_case "setup.md: the host-aware target reaches the channel, path-check, and PowerShell lines"
+skill=$(cat "$REPO_ROOT/src/references/setup.md")
 skill_assert_fixed 'For Claude Code or OpenCode, on POSIX use' "$skill"
 skill_assert_fixed '--agent codex --channel "$CHROME_CHANNEL"' "$skill"
 skill_assert_fixed '-Agent codex -Channel $CHROME_CHANNEL' "$skill"
-skill_assert_fixed '-Agent <target>` for the host-aware setup branch above' "$skill"
+skill_assert_fixed 'Codex: `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent codex`, or on native Windows `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent codex`.' "$skill"
 skill_assert_fixed 'For Codex there is no printed path to check: success is the line `setup-mcp: registered chrome-devtools with the Codex CLI` and exit 0' "$skill"
 
 test_case "docs: troubleshooting covers a wrong-directory setup"
@@ -205,8 +209,10 @@ for expected in \
   skill_assert_fixed "$expected" "$body"
 done
 
-test_case "docs: SKILL.md's reference link resolves"
-if [ -f "$REPO_ROOT/src/references/troubleshooting.md" ]; then _ok "troubleshooting.md exists"; else _fail "dangling reference"; fi
+test_case "docs: SKILL.md's reference links resolve"
+for ref in $(grep -o 'references/[a-z-]*\.md' "$REPO_ROOT/src/SKILL.md" "$REPO_ROOT/src/references/troubleshooting.md" | sed 's/^[^:]*://' | sort -u); do
+  if [ -f "$REPO_ROOT/src/$ref" ]; then _ok "$ref exists"; else _fail "dangling reference $ref"; fi
+done
 
 test_case "docs: README mirrors shipped agent config targets and platform flags"
 body=$(cat "$REPO_ROOT/README.md")
@@ -223,15 +229,15 @@ for expected in \
   '"mcp": {' \
   '"type": "local",' \
   '"enabled": true,' \
-  '"command": ["npx", "-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders"]' \
+  '"command": ["npx", "-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux"]' \
   '### Codex config (`~/.codex/config.toml`)' \
-  'codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest --autoConnect --redactNetworkHeaders' \
+  'codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest --autoConnect --redactNetworkHeaders --no-performance-crux' \
   '[mcp_servers.chrome-devtools]' \
   '### VS Code config (`.vscode/mcp.json`)' \
   'VS Code uses a top-level `servers` object, not `mcpServers`.' \
   '"servers": {' \
   '`type: "stdio"` is optional because' \
-  '"args": ["-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders"]' \
+  '"args": ["-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux"]' \
   'sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto' \
   'pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto' \
   'Flags: `--runner "<argv>"`' \
@@ -278,6 +284,7 @@ readme=$(cat "$REPO_ROOT/README.md")
 # A bare relative path fails from the project root, because scripts/ lives under
 # the installed skill directory and preflight must run in the project.
 troubleshooting=$(cat "$REPO_ROOT/src/references/troubleshooting.md")
+setup=$(cat "$REPO_ROOT/src/references/setup.md")
 for bare in \
   'sh scripts/setup-mcp.sh' \
   'pwsh -File scripts/setup-mcp.ps1' \
@@ -298,9 +305,16 @@ for bare in \
   else
     _ok "troubleshooting.md has no bare '$bare'"
   fi
+  if printf '%s\n' "$setup" | grep -F -q -- "$bare"; then
+    _fail "setup.md has a bare relative invocation: $bare"
+  else
+    _ok "setup.md has no bare '$bare'"
+  fi
 done
-skill_assert_fixed 'sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto' "$skill"
-skill_assert_fixed 'pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto' "$skill"
+skill_assert_fixed 'sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent <target>' "$skill"
+skill_assert_fixed 'pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent <target>' "$skill"
+skill_assert_fixed 'sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto' "$setup"
+skill_assert_fixed 'pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto' "$setup"
 
 test_case "docs: the NODE_MISSING row warns that a pre-install shell has a stale PATH"
 skill="$REPO_ROOT/src/SKILL.md"
@@ -333,3 +347,30 @@ skill_assert_fixed 'session and does not transfer to a different class of risky 
 skill_assert_fixed 'take a fresh `take_snapshot` before reusing any element reference' "$skill"
 skill_assert_fixed 'Pick the tab by what it shows' "$skill"
 skill_assert_fixed 'Verify the requested outcome from what the page now shows' "$skill"
+
+test_case "SKILL.md: targets tabs by pageId and keeps setup detail out of the attach path"
+skill_file="$REPO_ROOT/src/SKILL.md"
+skill=$(cat "$skill_file")
+skill_assert_fixed 'Page tools take that tab'"'"'s `pageId`' "$skill"
+skill_assert_fixed '`includeSnapshot: true`' "$skill"
+skill_assert_fixed '`filePath`' "$skill"
+for moved in 'The POSIX setup CLI accepts' 'usage: setup-mcp.sh' 'manual-merge snippet is printed'; do
+  if grep -qF -- "$moved" "$skill_file"; then _fail "SKILL.md still carries setup detail: $moved"
+  else _ok "SKILL.md leaves '$moved' to setup.md"; fi
+done
+
+test_case "docs: the CrUX default is documented where it applies"
+skill=$(sed -n '/^## 7\. Sensitive data/,/^## Reference/p' "$REPO_ROOT/src/SKILL.md")
+setup=$(cat "$REPO_ROOT/src/references/setup.md")
+troubleshooting=$(cat "$REPO_ROOT/src/references/troubleshooting.md")
+readme=$(cat "$REPO_ROOT/README.md")
+skill_assert_fixed '`--no-performance-crux`' "$skill"
+skill_assert_fixed 'The setup defaults are exactly `--autoConnect`, `--redactNetworkHeaders`, `--no-performance-crux`, in' "$setup"
+skill_assert_fixed '## Performance traces show no field data' "$troubleshooting"
+skill_assert_fixed '`--no-performance-crux`, which stops performance' "$readme"
+
+test_case "docs: troubleshooting covers a server that exits at startup"
+body=$(cat "$REPO_ROOT/src/references/troubleshooting.md")
+skill_assert_fixed 'Node 20.19+, 22.12+, or 23+' "$body"
+skill_assert_fixed '`startup_timeout_sec = 20`' "$body"
+skill_assert_fixed 'Node 20.19+,' "$(cat "$REPO_ROOT/README.md")"

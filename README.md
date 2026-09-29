@@ -6,8 +6,8 @@ cookies, logins, and tabs you already have open, through the
 
 ## Requirements
 
-- **Node.js LTS** with `npx` (hard requirement of `chrome-devtools-mcp`). `bunx`, `pnpm dlx`, or a
-  globally installed `chrome-devtools-mcp` also work.
+- **Node.js LTS** with `npx` (hard requirement of `chrome-devtools-mcp`, which needs Node 20.19+,
+  22.12+, or 23+). `bunx`, `pnpm dlx`, or a globally installed `chrome-devtools-mcp` also work.
 - **Google Chrome 144 or newer.** `--autoConnect` attaches to your default profile, and that is a
   144+ feature.
 - A **one-time opt-in inside Chrome**: open `chrome://inspect/#remote-debugging` and click Allow.
@@ -80,7 +80,7 @@ Preflight detects all five locations, so a hand-written Cursor or VS Code config
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders"]
+      "args": ["-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux"]
     }
   }
 }
@@ -98,7 +98,7 @@ arguments.
     "chrome-devtools": {
       "type": "local",
       "enabled": true,
-      "command": ["npx", "-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders"]
+      "command": ["npx", "-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux"]
     }
   }
 }
@@ -111,7 +111,7 @@ this touches your **global** Codex config. Use the explicit `setup-mcp.sh --agen
 `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent codex`) when you want to update it:
 
 ```bash
-codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest --autoConnect --redactNetworkHeaders
+codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest --autoConnect --redactNetworkHeaders --no-performance-crux
 ```
 
 That produces:
@@ -119,7 +119,7 @@ That produces:
 ```toml
 [mcp_servers.chrome-devtools]
 command = "npx"
-args = ["-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders"]
+args = ["-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux"]
 ```
 
 ### VS Code config (`.vscode/mcp.json`)
@@ -133,7 +133,7 @@ stdio is the default.
   "servers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders"]
+      "args": ["-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux"]
     }
   }
 }
@@ -164,7 +164,8 @@ See `references/troubleshooting.md` for anything else.
 ## Security note
 
 Attaching to your real profile exposes every logged-in session to the agent and to page content.
-`--redactNetworkHeaders` is on by default. The skill's policy requires explicit approval before
+`--redactNetworkHeaders` is on by default, and so is `--no-performance-crux`, which stops performance
+traces from sending the traced URLs to Google's CrUX API. The skill's policy requires explicit approval before
 reading credentials, cookies, tokens, payment details, or private messages, and confirmation before
 destructive, irreversible, or outward-facing actions.
 

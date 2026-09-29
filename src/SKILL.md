@@ -13,8 +13,8 @@ set up; the whole point of this skill is to reach the user's task without ceremo
 If `chrome-devtools` MCP tools are present in this session, call `list_pages` immediately.
 
 That call only succeeds when config, Chrome version, and the `chrome://inspect` opt-in are all
-already good, so it **is** the check. On success: say nothing about setup, `select_page` on the tab
-the user already has open, and get on with the task.
+already good, so it **is** the check. On success: say nothing about setup, pick the tab the user already
+has open (§5), and get on with the task.
 
 Run preflight only when `list_pages` fails or the tools are absent. Do not use it as idle polling:
 reruns and re-probes after remediation or a user action are expected, but do not repeat it when
@@ -61,8 +61,8 @@ Read the `STATUS` and branch. Verdict precedence is first failing check wins: `N
 
 | STATUS | Do this |
 |---|---|
-| `READY` | If the `chrome-devtools` tools are present, say nothing: `list_pages` → `select_page` → the user's task. If the tools are absent, do not call `list_pages` yet: the config may have just been written, so reload/restart the MCP connection, wait for the tools to appear, then continue. |
-| `NOT_CONFIGURED` | Pick the setup target for the host you are actually running in, then run setup without asking. Under Claude Code or OpenCode use `--agent auto` (`-Agent auto`), which reads markers in the output directory to choose between them. Under Codex use `--agent codex` (`-Agent codex`), which writes the user's global `~/.codex/config.toml`; `auto` never writes it, so following the `auto` branch under Codex configures a consumer that is not running. POSIX: `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent <target>`; native Windows: `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent <target>`. Under `auto` the command writes into the current working directory, which must be the project root unless an explicit output directory is supplied; under `codex` it ignores both the working directory and the output override and writes the global file. On successful setup the config was just written; reload/restart the MCP connection before calling any tool, because MCP config is read at startup. |
+| `READY` | If the `chrome-devtools` tools are present, say nothing: `list_pages` → pick the tab (§5) → the user's task. If the tools are absent, do not call `list_pages` yet: the config may have just been written, so reload/restart the MCP connection, wait for the tools to appear, then continue. |
+| `NOT_CONFIGURED` | Pick the setup target for the host you are actually running in, then run setup without asking. Under Claude Code or OpenCode use `--agent auto` (`-Agent auto`), which reads markers in the output directory to choose between them. Under Codex use `--agent codex` (`-Agent codex`), which writes the user's global `~/.codex/config.toml`: say so before running it; `auto` never writes it, so following the `auto` branch under Codex configures a consumer that is not running. POSIX: `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent <target>`; native Windows: `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent <target>`. Under `auto` the command writes into the current working directory, which must be the project root unless an explicit output directory is supplied. If `CHROME_CHANNEL` is not `stable`, or setup exits non-zero, read `references/setup.md` first: it has the channel flag, the exit codes, and the merge rules. On successful setup the config was just written; reload/restart the MCP connection before calling any tool, because MCP config is read at startup. |
 | `NEEDS_OPT_IN` | Stop. One instruction: "Open `chrome://inspect/#remote-debugging` in Chrome and click Allow." Then re-run preflight. |
 | `CHROME_NOT_RUNNING` | Ask the user to open Chrome normally, then re-run preflight. |
 | `CHROME_TOO_OLD` | Report the actual `CHROME_VERSION` found and that `--autoConnect` needs Chrome 144+. Offer the fallbacks below as an explicit choice. |
@@ -71,48 +71,6 @@ Read the `STATUS` and branch. Verdict precedence is first failing check wins: `N
 
 `NODE_MISSING` means `RUNNER=none`: preflight found no `npx`, `bunx`, `pnpm`, or global
 `chrome-devtools-mcp` runner. If one of those is available, preflight reports that runner instead.
-
-If preflight reports `CHROME_CHANNEL` as `beta`, `dev`, or `canary`, pass that exact reported value through.
-For Claude Code or OpenCode, on POSIX use `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto --channel "$CHROME_CHANNEL"`;
-on native Windows use `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto -Channel $CHROME_CHANNEL`.
-Under Codex use `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent codex --channel "$CHROME_CHANNEL"`
-or `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent codex -Channel $CHROME_CHANNEL`.
-A non-stable Chrome keeps its
-profile in a different directory and `--autoConnect` must be told which one. Omit the channel flag for
-`stable`.
-
-The POSIX setup CLI accepts agents `auto|claude|codex|opencode`, plus `--runner "<argv>"`,
-`--channel beta|dev|canary`, `--out-dir <dir>`, and `--no-redact`. The native PowerShell spelling is `-Agent`, `-Runner`, `-Channel`, and `-NoRedact`; add `-OutDir <dir>` for the output-directory override. It accepts the same three channel values. On native Windows, use
-`pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent <target>` for the host-aware setup branch above. Both setup CLIs use exit 0
-for success and exit 2 for bad usage or invalid agent/channel values. Exit 3 is a setup failure on
-either platform, not a preflight verdict and not synonymous with manual merge.
-
-The help output is:
-
-`usage: setup-mcp.sh --agent auto|claude|codex|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact]`
-
-`usage: setup-mcp.ps1 -Agent auto|claude|codex|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact]`
-
-`auto` configures project-scoped agents only (Claude Code and OpenCode); Codex requires an explicit `--agent codex` and writes the user's global `~/.codex/config.toml`.
-
-For `auto`, markers in the resolved output directory select the project target: `.mcp.json` or `.claude/` selects Claude Code, and `opencode.json` selects OpenCode. With no marker, `auto` falls back to Claude Code. It never writes Codex's global config. When Codex is present, POSIX prints `setup-mcp: codex detected but not configured; run --agent codex to update your global Codex config.` and PowerShell prints `setup-mcp: codex detected but not configured; run -Agent codex to update your global Codex config.`
-
-Codex configuration is global: it applies to every project on the machine, so say that you are writing it before you do. Setup merges into an existing config rather than replacing it. For the POSIX existing-JSON/no-Node case described below, hand the manual-merge snippet to the user rather than overwriting the file to get past it. Other exit-3 failures need diagnosis; they do not promise a snippet.
-
-For project targets: A successful setup prints the absolute path it wrote; check that path against the project root. For Codex there is no printed path to check: success is the line `setup-mcp: registered chrome-devtools with the Codex CLI` and exit 0, and the file written is `~/.codex/config.toml`, not the project root; the output override does not change its global scope. `--out-dir` and `-OutDir` require an existing directory; neither script creates it.
-
-The setup defaults are exactly `--autoConnect`, `--redactNetworkHeaders`, in that order;
-`--no-redact` (or `-NoRedact`) drops the redaction flag, and a channel flag follows those defaults.
-
-If preflight reports `CHROME_CHANNEL=chromium`, do not pass `--channel chromium` or `-Channel chromium`:
-neither setup CLI accepts that value. Offer the `--browserUrl` fallback below, using a Chromium instance
-the user launches with remote debugging, or ask the user to use a supported Chrome channel.
-
-For `setup-mcp.sh`, an existing config with no Node available for JSON merging is left untouched, a
-manual-merge snippet is printed, and the command exits 3. Invalid JSON during a Node merge and Codex
-registration failures also exit 3. `setup-mcp.ps1` always merges an existing config natively with its
-PowerShell JSON parser; invalid existing JSON and Codex registration failures can also exit 3, but it
-does not use the sh manual-merge branch. This cross-platform difference is deliberate.
 
 ## 4. Fallbacks: offered, never chosen silently
 
@@ -129,16 +87,19 @@ Silent degradation is prohibited. Never quietly fall back to an isolated profile
 
 You are driving the user's live browser, not a scratch one.
 
-- Attach to what exists: `list_pages` → `select_page`. Don't spray new tabs.
-- Prefer `take_snapshot` for reading page structure; screenshot when layout or visual state actually
-  matters.
+- Attach to what exists: call `list_pages`. Pick the tab by what it shows — its title and URL — not
+  by its position in the list. When more than one tab could be the right one, name the candidates and
+  ask instead of guessing. Page tools take that tab's `pageId` (the server default); pass it rather
+  than relying on `select_page`, which only sets the target for calls without one. Don't spray new tabs.
 - Close only tabs you opened. A tab the user already had open is theirs: close it only when the user asks for that tab, and name the tab you are closing so they can stop you if it is the wrong one. §6's confirm-first entry is how you obtain that request when the user has not already made it; this bullet says which tab the rule is about, not a second gate.
 - Leave the browser as you found it: no clearing storage, no signing out, no changing settings as a
   side effect.
-- Pick the tab by what it shows — its title and URL — not by its position in `list_pages`. When
-  more than one tab could be the right one, name the candidates and ask instead of guessing.
 - After any navigation, reload, or action that re-renders the page, take a fresh `take_snapshot` before reusing any element reference. A reference from an earlier snapshot can now point at a
-  different element, or at nothing.
+  different element, or at nothing. When the next step needs that fresh state anyway, pass
+  `includeSnapshot: true` to the input action instead of making a second call.
+- Read with `take_snapshot`; screenshot only when layout or visual state actually matters. Send a
+  large snapshot, screenshot, or trace to `filePath` instead of into the conversation, unless the
+  page holds the sensitive data in §7.
 - Verify the requested outcome from what the page now shows — the URL, the confirmation, the
   changed row — not from the fact that a tool call returned without error.
 
@@ -185,9 +146,13 @@ The real profile means every logged-in session is reachable.
 - Redact when quoting: truncate tokens and keys; never reproduce a full card or account number.
 - The default config carries `--redactNetworkHeaders`. Drop it only when the user is deliberately
   debugging auth headers and says so, and note the change when you do.
+- The default config also carries `--no-performance-crux`, so a performance trace does not send the
+  traced URLs to Google's CrUX API. Drop it only when the user asks for field data, and say that the
+  traced URLs will leave the machine.
 - Say once, at first setup, that attaching to the real profile exposes logged-in sessions to you and
   to page content. Don't repeat it every run.
 
 ## Reference
 
-`references/troubleshooting.md`: failure modes and their fixes.
+- `references/setup.md`: the setup CLI's flags, channels, exit codes, and merge rules.
+- `references/troubleshooting.md`: failure modes and their fixes.

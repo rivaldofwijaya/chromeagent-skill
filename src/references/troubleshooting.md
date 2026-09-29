@@ -35,7 +35,7 @@ Update Chrome (Menu → Help → About Google Chrome), or use a fallback:
 ## `NOT_CONFIGURED`
 
 No `chrome-devtools` entry with `--autoConnect` in any scanned config. Choose the target for the current host: `auto` for Claude Code or OpenCode, `codex` for Codex. Codex writes global `~/.codex/config.toml`; announce that scope before setup. Run `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent <target>`, then **restart your agent**. MCP config is read at startup.
-On native Windows, use `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent <target>` instead. Pass any reported beta/dev/canary channel as described in SKILL.md.
+On native Windows, use `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent <target>` instead. Pass any reported beta/dev/canary channel as described in `references/setup.md`.
 
 Scanned, in order: `./.mcp.json`, `./.vscode/mcp.json`, `./.cursor/mcp.json`, `./opencode.json`,
 `./.codex/config.toml`, `~/.codex/config.toml`, `~/.config/opencode/opencode.json`.
@@ -103,6 +103,17 @@ after setup writes the config.
 **Fix:** Reload or restart the MCP connection, wait for the tools to appear, then continue. The MCP
 server loads at agent startup.
 
+If the tools still do not appear, the server may be exiting at startup, which preflight cannot see:
+
+- **Node too old.** `chrome-devtools-mcp` needs Node 20.19+, 22.12+, or 23+, and exits with
+  `does not support Node <version>` otherwise. Preflight only checks that a runner exists. Run
+  `node --version`; upgrade to the current LTS if it is older.
+- **Startup timeout under Codex on Windows.** The first `npx` run downloads the package and can
+  outlast Codex's default 10-second MCP startup timeout. Add `startup_timeout_sec = 20` under
+  `[mcp_servers.chrome-devtools]` in `~/.codex/config.toml`, then restart Codex.
+- **Anything else.** Run `npx chrome-devtools-mcp@latest --help` from the same shell to see whether
+  the server starts at all.
+
 ### Other `READY` checks
 
 - `DEBUG_REACHABLE=optin` means something answered on the debug port with a non-200 status. That is
@@ -137,3 +148,9 @@ server loads at agent startup.
 
 That is `--redactNetworkHeaders`, on by default. Re-run setup with `--no-redact` only when you are
 deliberately debugging auth headers, and be aware the agent will then see them.
+
+## Performance traces show no field data
+
+That is `--no-performance-crux`, on by default, so traces do not send the traced URLs to Google's CrUX
+API. To get field data, remove the flag from the `chrome-devtools` entry by hand and restart the
+agent; the traced URLs will then leave the machine.
