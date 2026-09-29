@@ -237,6 +237,9 @@ function Get-RunnerParts {
 function Get-ServerArgs {
   $argsList = @('chrome-devtools-mcp@latest', '--autoConnect')
   if (-not $NoRedact) { $argsList += '--redactNetworkHeaders' }
+  # Performance traces otherwise send the traced URLs to the CrUX API; with a
+  # real profile those URLs can be private.
+  $argsList += '--no-performance-crux'
   if ($Channel) { $argsList += @('--channel', $Channel) }
   return @($argsList)
 }

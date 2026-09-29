@@ -108,6 +108,9 @@ runner_command() {
 mcp_args() {
   printf 'chrome-devtools-mcp@latest --autoConnect'
   [ "$REDACT" = yes ] && printf ' --redactNetworkHeaders'
+  # Performance traces otherwise send the traced URLs to the CrUX API; with a
+  # real profile those URLs can be private.
+  printf ' --no-performance-crux'
   [ -n "$CHANNEL" ] && printf ' --channel %s' "$CHANNEL"
   printf '\n'
 }
