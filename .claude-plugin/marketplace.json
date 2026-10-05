@@ -1,0 +1,12 @@
+{
+  "name": "chromeagent-skill",
+  "owner": { "name": "rivaldofwijaya" },
+  "metadata": { "description": "The chromeagent skill for driving the user's own Chrome through the chrome-devtools MCP server." },
+  "plugins": [
+    {
+      "name": "chromeagent",
+      "source": "./",
+      "description": "Drive the user's own running Chrome through the chrome-devtools MCP server."
+    }
+  ]
+}

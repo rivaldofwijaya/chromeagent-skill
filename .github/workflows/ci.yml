@@ -34,7 +34,7 @@ jobs:
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Lint POSIX shell
-        run: shellcheck -S error src/scripts/*.sh dev/tests/*.sh
+        run: shellcheck -S error skills/chromeagent/scripts/*.sh dev/tests/*.sh
 
   # `shell:` takes no expression, so the two shells are separate jobs rather
   # than a matrix leg. Keep the two run blocks identical.
@@ -47,7 +47,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          Get-ChildItem src/scripts -Filter *.ps1 | ForEach-Object {
+          Get-ChildItem skills/chromeagent/scripts -Filter *.ps1 | ForEach-Object {
             $errors = $null
             [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errors) | Out-Null
             if ($errors) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
@@ -63,7 +63,7 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          Get-ChildItem src/scripts -Filter *.ps1 | ForEach-Object {
+          Get-ChildItem skills/chromeagent/scripts -Filter *.ps1 | ForEach-Object {
             $errors = $null
             [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errors) | Out-Null
             if ($errors) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }

@@ -9,8 +9,8 @@
 ## Verification
 
 - [ ] `dev/tests/run-tests.sh` passes locally
-- [ ] `src/scripts/preflight.sh` (or `preflight.ps1` on Windows) still reports the port and profile it used
-- [ ] `src/SKILL.md` and `README.md` updated if the user-facing contract changed
+- [ ] `skills/chromeagent/scripts/preflight.sh` (or `preflight.ps1` on Windows) still reports the port and profile it used
+- [ ] `skills/chromeagent/SKILL.md` and `README.md` updated if the user-facing contract changed
 
 <!-- Paste the relevant test output below. -->
 

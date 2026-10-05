@@ -1,0 +1,7 @@
+{
+  "name": "chromeagent",
+  "description": "Drive the user's own running Chrome, with their real profile, cookies, logins, and open tabs, through the chrome-devtools MCP server. Verifies or performs one-time setup, then attaches and works.",
+  "version": "1.4.0",
+  "author": { "name": "rivaldofwijaya" },
+  "skills": "./skills"
+}

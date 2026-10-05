@@ -30,7 +30,7 @@ jobs:
           # The repository has no dist/ directory; build in the runner's temp space.
           staging="$RUNNER_TEMP/chromeagent-skill"
           mkdir -p "$staging"
-          cp -R src/. "$staging/"
+          cp -R skills/chromeagent/. "$staging/"
           cp README.md LICENSE SECURITY.md "$staging/"
           (cd "$RUNNER_TEMP" && zip -qr "chromeagent-skill-${version}.zip" chromeagent-skill)
           ls -l "$RUNNER_TEMP"

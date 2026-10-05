@@ -5,7 +5,7 @@ skill_assert_fixed() {
 }
 
 test_case "SKILL.md: has frontmatter with name and description"
-skill="$REPO_ROOT/src/SKILL.md"
+skill="$REPO_ROOT/skills/chromeagent/SKILL.md"
 head=$(head -5 "$skill")
 assert_contains '^---' "$head"
 assert_contains 'name: chromeagent' "$head"
@@ -19,7 +19,7 @@ closing=$(sed -n '2,20p' "$skill" | grep -n '^---$' | head -1 | cut -d: -f1)
 if [ -n "$closing" ]; then _ok "frontmatter has a closing delimiter"; else _fail "missing closing frontmatter delimiter"; fi
 
 test_case "SKILL.md: documents every verdict as a decision-table branch"
-skill="$REPO_ROOT/src/SKILL.md"
+skill="$REPO_ROOT/skills/chromeagent/SKILL.md"
 table=$(sed -n '/^| STATUS | Do this |$/,/^$/p' "$skill")
 for v in READY NOT_CONFIGURED NEEDS_OPT_IN CHROME_NOT_RUNNING CHROME_TOO_OLD CHROME_MISSING NODE_MISSING; do
   rows=$(printf '%s\n' "$table" | grep -c "^| \`$v\` |")
@@ -27,7 +27,7 @@ for v in READY NOT_CONFIGURED NEEDS_OPT_IN CHROME_NOT_RUNNING CHROME_TOO_OLD CHR
 done
 
 test_case "SKILL.md: puts the fast path section before the preflight script"
-skill="$REPO_ROOT/src/SKILL.md"
+skill="$REPO_ROOT/skills/chromeagent/SKILL.md"
 fast_heading=$(grep -n '^## 1\. Fast path' "$skill" | head -1 | cut -d: -f1)
 pre_heading=$(grep -n '^## 2\. Preflight$' "$skill" | head -1 | cut -d: -f1)
 preflight_command=$(grep -n '^sh /path/to/chromeagent-skill/scripts/preflight\.sh' "$skill" | head -1 | cut -d: -f1)
@@ -41,7 +41,7 @@ else
 fi
 
 test_case "SKILL.md: reloads absent MCP tools and permits remediation reruns"
-skill="$REPO_ROOT/src/SKILL.md"
+skill="$REPO_ROOT/skills/chromeagent/SKILL.md"
 body=$(cat "$skill")
 table=$(sed -n '/^| STATUS | Do this |$/,/^$/p' "$skill")
 ready_row=$(printf '%s\n' "$table" | grep '^| `READY` |')
@@ -56,7 +56,7 @@ skill_assert_fixed 'Do not use it as idle polling' "$body"
 skill_assert_fixed 'reruns and re-probes after remediation or a user action are expected' "$body"
 
 test_case "SKILL.md: documents the preflight contract and decision signal"
-skill="$REPO_ROOT/src/SKILL.md"
+skill="$REPO_ROOT/skills/chromeagent/SKILL.md"
 body=$(cat "$skill")
 expected_keys='`PLATFORM`, `RUNNER`, `RUNNER_CMD`, `CHROME_PATH`, `CHROME_CHANNEL`, `CHROME_VERSION`, `CHROME_MAJOR`, `CHROME_OK`, `USER_DATA_DIR`, `CHROME_RUNNING`, `DEBUG_PORT`, `DEBUG_REACHABLE`, `MCP_CONFIG_FILE`, `MCP_CONFIGURED`, `STATUS`.'
 keys_line=$(grep '^`PLATFORM`' "$skill" | head -1)
@@ -69,7 +69,7 @@ skill_assert_fixed '`STATUS` value is the signal; never branch on preflight' "$s
 skill_assert_fixed '`--autoConnect` needs Chrome 144+' "$body"
 
 test_case "setup.md: documents platform setup flags, channels, and exit failures"
-skill="$REPO_ROOT/src/references/setup.md"
+skill="$REPO_ROOT/skills/chromeagent/references/setup.md"
 body=$(cat "$skill")
 skill_assert_fixed 'sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto --channel "$CHROME_CHANNEL"' "$body"
 skill_assert_fixed 'pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto -Channel $CHROME_CHANNEL' "$body"
@@ -84,8 +84,8 @@ skill_assert_fixed 'invalid existing JSON and Codex registration failures can al
 skill_assert_fixed 'does not use the sh manual-merge branch' "$body"
 
 test_case "docs: documents the cwd contract, output directory, and auto scope"
-skill=$(cat "$REPO_ROOT/src/SKILL.md")
-setup=$(cat "$REPO_ROOT/src/references/setup.md")
+skill=$(cat "$REPO_ROOT/skills/chromeagent/SKILL.md")
+setup=$(cat "$REPO_ROOT/skills/chromeagent/references/setup.md")
 readme=$(cat "$REPO_ROOT/README.md")
 cwd_sentence="Both setup scripts resolve paths relative to the current working directory, so run them from the project root; the skill's own directory is never the right place."
 auto_sentence='`auto` configures project-scoped agents only (Claude Code and OpenCode); Codex requires an explicit `--agent codex` and writes the user'\''s global `~/.codex/config.toml`.'
@@ -113,22 +113,22 @@ skill_assert_fixed 'setup-mcp: codex detected but not configured; run --agent co
 skill_assert_fixed 'setup-mcp: codex detected but not configured; run -Agent codex to update your global Codex config.' "$readme"
 
 test_case "SKILL.md: setup picks the target for the host it is running in"
-skill=$(cat "$REPO_ROOT/src/SKILL.md")
-table=$(sed -n '/^| STATUS | Do this |$/,/^$/p' "$REPO_ROOT/src/SKILL.md")
+skill=$(cat "$REPO_ROOT/skills/chromeagent/SKILL.md")
+table=$(sed -n '/^| STATUS | Do this |$/,/^$/p' "$REPO_ROOT/skills/chromeagent/SKILL.md")
 not_configured_row=$(printf '%s\n' "$table" | grep '^| `NOT_CONFIGURED` |')
 skill_assert_fixed 'Pick the setup target for the host you are actually running in' "$not_configured_row"
 skill_assert_fixed '--agent codex' "$not_configured_row"
 skill_assert_fixed 'writes the user'\''s global' "$not_configured_row"
 skill_assert_fixed 'config was just written' "$not_configured_row"
 skill_assert_fixed 'reload/restart the MCP connection' "$not_configured_row"
-setup=$(cat "$REPO_ROOT/src/references/setup.md")
+setup=$(cat "$REPO_ROOT/skills/chromeagent/references/setup.md")
 skill_assert_fixed 'Codex configuration is global: it applies to every project on the machine, so say that you are writing it before you do.' "$setup"
 skill_assert_fixed 'Setup merges into an existing config rather than replacing it.' "$setup"
 skill_assert_fixed 'say so before running it' "$not_configured_row"
 skill_assert_fixed 'read `references/setup.md` first' "$not_configured_row"
 
 test_case "setup.md: the host-aware target reaches the channel, path-check, and PowerShell lines"
-skill=$(cat "$REPO_ROOT/src/references/setup.md")
+skill=$(cat "$REPO_ROOT/skills/chromeagent/references/setup.md")
 skill_assert_fixed 'For Claude Code or OpenCode, on POSIX use' "$skill"
 skill_assert_fixed '--agent codex --channel "$CHROME_CHANNEL"' "$skill"
 skill_assert_fixed '-Agent codex -Channel $CHROME_CHANNEL' "$skill"
@@ -136,12 +136,12 @@ skill_assert_fixed 'Codex: `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh -
 skill_assert_fixed 'For Codex there is no printed path to check: success is the line `setup-mcp: registered chrome-devtools with the Codex CLI` and exit 0' "$skill"
 
 test_case "docs: troubleshooting covers a wrong-directory setup"
-body=$(cat "$REPO_ROOT/src/references/troubleshooting.md")
+body=$(cat "$REPO_ROOT/skills/chromeagent/references/troubleshooting.md")
 skill_assert_fixed '## Config was written to the wrong directory' "$body"
 skill_assert_fixed '`auto` does not configure Codex; use the explicit `--agent codex` (or `-Agent codex`) for the user'"'"'s global Codex config.' "$body"
 
 test_case "docs: troubleshooting picks the setup target for the host it is running in"
-body=$(cat "$REPO_ROOT/src/references/troubleshooting.md")
+body=$(cat "$REPO_ROOT/skills/chromeagent/references/troubleshooting.md")
 for expected in \
   'Choose the target for the current host: `auto` for Claude Code or OpenCode, `codex` for Codex.' \
   'Codex writes global `~/.codex/config.toml`; announce that scope before setup.' \
@@ -164,7 +164,7 @@ else
 fi
 
 test_case "SKILL.md: names both script flavours and the confirm-first policy"
-skill="$REPO_ROOT/src/SKILL.md"
+skill="$REPO_ROOT/skills/chromeagent/SKILL.md"
 body=$(cat "$skill")
 action=$(sed -n '/^## 6\. Action policy/,/^## 7\. Sensitive data/p' "$skill")
 assert_contains 'preflight.sh' "$body"
@@ -194,7 +194,7 @@ for expected in \
 done
 
 test_case "docs: troubleshooting names every verdict and gives the READY tools fix"
-body=$(cat "$REPO_ROOT/src/references/troubleshooting.md")
+body=$(cat "$REPO_ROOT/skills/chromeagent/references/troubleshooting.md")
 for expected in \
   '## `READY` but the MCP tools are absent from the session' \
   '## `NOT_CONFIGURED`' \
@@ -210,8 +210,8 @@ for expected in \
 done
 
 test_case "docs: SKILL.md's reference links resolve"
-for ref in $(grep -o 'references/[a-z-]*\.md' "$REPO_ROOT/src/SKILL.md" "$REPO_ROOT/src/references/troubleshooting.md" | sed 's/^[^:]*://' | sort -u); do
-  if [ -f "$REPO_ROOT/src/$ref" ]; then _ok "$ref exists"; else _fail "dangling reference $ref"; fi
+for ref in $(grep -o 'references/[a-z-]*\.md' "$REPO_ROOT/skills/chromeagent/SKILL.md" "$REPO_ROOT/skills/chromeagent/references/troubleshooting.md" | sed 's/^[^:]*://' | sort -u); do
+  if [ -f "$REPO_ROOT/skills/chromeagent/$ref" ]; then _ok "$ref exists"; else _fail "dangling reference $ref"; fi
 done
 
 test_case "docs: README mirrors shipped agent config targets and platform flags"
@@ -251,7 +251,7 @@ for expected in \
 done
 
 test_case "docs: troubleshooting covers shipped failure causes and fixes"
-body=$(cat "$REPO_ROOT/src/references/troubleshooting.md")
+body=$(cat "$REPO_ROOT/skills/chromeagent/references/troubleshooting.md")
 for expected in \
   '## `NODE_MISSING`' \
   '## `CHROME_MISSING`' \
@@ -279,12 +279,12 @@ for expected in \
 done
 
 test_case "docs: every script invocation resolves from the project root"
-skill=$(cat "$REPO_ROOT/src/SKILL.md")
+skill=$(cat "$REPO_ROOT/skills/chromeagent/SKILL.md")
 readme=$(cat "$REPO_ROOT/README.md")
 # A bare relative path fails from the project root, because scripts/ lives under
 # the installed skill directory and preflight must run in the project.
-troubleshooting=$(cat "$REPO_ROOT/src/references/troubleshooting.md")
-setup=$(cat "$REPO_ROOT/src/references/setup.md")
+troubleshooting=$(cat "$REPO_ROOT/skills/chromeagent/references/troubleshooting.md")
+setup=$(cat "$REPO_ROOT/skills/chromeagent/references/setup.md")
 for bare in \
   'sh scripts/setup-mcp.sh' \
   'pwsh -File scripts/setup-mcp.ps1' \
@@ -317,26 +317,26 @@ skill_assert_fixed 'sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent a
 skill_assert_fixed 'pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto' "$setup"
 
 test_case "docs: the NODE_MISSING row warns that a pre-install shell has a stale PATH"
-skill="$REPO_ROOT/src/SKILL.md"
+skill="$REPO_ROOT/skills/chromeagent/SKILL.md"
 table=$(sed -n '/^| STATUS | Do this |$/,/^$/p' "$skill")
 node_row=$(printf '%s\n' "$table" | grep '^| `NODE_MISSING` |')
 skill_assert_fixed 'open a **new** terminal (or refresh `PATH`) before re-probing' "$node_row"
 skill_assert_fixed 'still has the pre-install `PATH`' "$node_row"
 
 test_case "SKILL.md: one consistent rule for pre-existing tabs"
-skill=$(cat "$REPO_ROOT/src/SKILL.md")
+skill=$(cat "$REPO_ROOT/skills/chromeagent/SKILL.md")
 skill_assert_fixed 'Close only tabs you opened.' "$skill"
 skill_assert_fixed 'A tab the user already had open is theirs: close it only when the user asks for that tab, and name the tab you are closing so they can stop you if it is the wrong one.' "$skill"
 skill_assert_fixed "this bullet says which tab the rule is about, not a second gate" "$skill"
 skill_assert_fixed 'closing a tab the user already had open' "$skill"
-if grep -qF 'Never close a tab the user already had open' "$REPO_ROOT/src/SKILL.md"; then
+if grep -qF 'Never close a tab the user already had open' "$REPO_ROOT/skills/chromeagent/SKILL.md"; then
   _fail "the absolute prohibition still contradicts the confirm-first entry"
 else
   _ok "no absolute tab prohibition remains"
 fi
 
 test_case "SKILL.md: authorisation follows effect, references are refreshed, outcomes are verified"
-skill=$(cat "$REPO_ROOT/src/SKILL.md")
+skill=$(cat "$REPO_ROOT/skills/chromeagent/SKILL.md")
 skill_assert_fixed 'Authorisation follows the effect, not the mechanism.' "$skill"
 skill_assert_fixed 'A click that publishes is a publication, and a script that posts a request is that request.' "$skill"
 skill_assert_fixed 'A request that names the effect carries its own authorisation' "$skill"
@@ -349,7 +349,7 @@ skill_assert_fixed 'Pick the tab by what it shows' "$skill"
 skill_assert_fixed 'Verify the requested outcome from what the page now shows' "$skill"
 
 test_case "SKILL.md: targets tabs by pageId and keeps setup detail out of the attach path"
-skill_file="$REPO_ROOT/src/SKILL.md"
+skill_file="$REPO_ROOT/skills/chromeagent/SKILL.md"
 skill=$(cat "$skill_file")
 skill_assert_fixed 'Page tools take that tab'"'"'s `pageId`' "$skill"
 skill_assert_fixed '`includeSnapshot: true`' "$skill"
@@ -360,9 +360,9 @@ for moved in 'The POSIX setup CLI accepts' 'usage: setup-mcp.sh' 'manual-merge s
 done
 
 test_case "docs: the CrUX default is documented where it applies"
-skill=$(sed -n '/^## 7\. Sensitive data/,/^## Reference/p' "$REPO_ROOT/src/SKILL.md")
-setup=$(cat "$REPO_ROOT/src/references/setup.md")
-troubleshooting=$(cat "$REPO_ROOT/src/references/troubleshooting.md")
+skill=$(sed -n '/^## 7\. Sensitive data/,/^## Reference/p' "$REPO_ROOT/skills/chromeagent/SKILL.md")
+setup=$(cat "$REPO_ROOT/skills/chromeagent/references/setup.md")
+troubleshooting=$(cat "$REPO_ROOT/skills/chromeagent/references/troubleshooting.md")
 readme=$(cat "$REPO_ROOT/README.md")
 skill_assert_fixed '`--no-performance-crux`' "$skill"
 skill_assert_fixed 'The setup defaults are exactly `--autoConnect`, `--redactNetworkHeaders`, `--no-performance-crux`, in' "$setup"
@@ -370,7 +370,7 @@ skill_assert_fixed '## Performance traces show no field data' "$troubleshooting"
 skill_assert_fixed '`--no-performance-crux`, which stops performance' "$readme"
 
 test_case "docs: troubleshooting covers a server that exits at startup"
-body=$(cat "$REPO_ROOT/src/references/troubleshooting.md")
+body=$(cat "$REPO_ROOT/skills/chromeagent/references/troubleshooting.md")
 skill_assert_fixed 'Node 20.19+, 22.12+, or 23+' "$body"
 skill_assert_fixed '`startup_timeout_sec = 20`' "$body"
 skill_assert_fixed 'Node 20.19+,' "$(cat "$REPO_ROOT/README.md")"

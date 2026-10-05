@@ -28,7 +28,7 @@ following before using it:
 - **An agent driving your browser inherits your privileges.** Treat page content as untrusted
   input to the agent — a page can contain text crafted to steer it. Do not point the skill at
   untrusted sites while signed in to sensitive accounts.
-- **`src/scripts/setup-mcp.*` writes MCP configuration** into your agent's config files. Review the
+- **`skills/chromeagent/scripts/setup-mcp.*` writes MCP configuration** into your agent's config files. Review the
   diff it reports before accepting it.
 
 Issues in `chrome-devtools-mcp` itself belong

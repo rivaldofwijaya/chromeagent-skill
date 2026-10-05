@@ -56,11 +56,11 @@ stub_cmd() {
 }
 
 run_preflight() {
-  (cd "$SANDBOX/project" && sh "$REPO_ROOT/src/scripts/preflight.sh" 2>/dev/null)
+  (cd "$SANDBOX/project" && sh "$REPO_ROOT/skills/chromeagent/scripts/preflight.sh" 2>/dev/null)
 }
 
 run_setup() {
-  (cd "$SANDBOX/project" && sh "$REPO_ROOT/src/scripts/setup-mcp.sh" "$@" 2>&1)
+  (cd "$SANDBOX/project" && sh "$REPO_ROOT/skills/chromeagent/scripts/setup-mcp.sh" "$@" 2>&1)
 }
 
 test_case() { CURRENT="$1"; sandbox_new; }

@@ -4,7 +4,7 @@ if ! host_tool_path pwsh >/dev/null 2>&1; then
 else
 
 run_ps1() {
-  (cd "$SANDBOX/project" && HOME="$HOME" pwsh -NoProfile -File "$REPO_ROOT/src/scripts/preflight.ps1" 2>/dev/null)
+  (cd "$SANDBOX/project" && HOME="$HOME" pwsh -NoProfile -File "$REPO_ROOT/skills/chromeagent/scripts/preflight.ps1" 2>/dev/null)
 }
 
 test_case "ps1: emits the same key set in the same order as the sh probe"
@@ -71,7 +71,7 @@ assert_kv MCP_CONFIGURED no "$out"
 assert_status NOT_CONFIGURED "$out"
 
 run_setup_ps1() {
-  (cd "$SANDBOX/project" && HOME="$HOME" pwsh -NoProfile -File "$REPO_ROOT/src/scripts/setup-mcp.ps1" "$@" 2>&1)
+  (cd "$SANDBOX/project" && HOME="$HOME" pwsh -NoProfile -File "$REPO_ROOT/skills/chromeagent/scripts/setup-mcp.ps1" "$@" 2>&1)
 }
 
 run_setup_ps1_timeout() {
@@ -80,7 +80,7 @@ run_setup_ps1_timeout() {
   # single-shot, so a failed timeout assertion cannot be followed by a hang.
   secs="$1"; shift
   timeout_output="$SANDBOX/ps1-timeout.out"
-  ( cd "$SANDBOX/project" && HOME="$HOME" pwsh -NoProfile -File "$REPO_ROOT/src/scripts/setup-mcp.ps1" "$@" >"$timeout_output" 2>&1 ) &
+  ( cd "$SANDBOX/project" && HOME="$HOME" pwsh -NoProfile -File "$REPO_ROOT/skills/chromeagent/scripts/setup-mcp.ps1" "$@" >"$timeout_output" 2>&1 ) &
   rp=$!
   ( sleep "$secs"; kill -9 "$rp" 2>/dev/null ) &
   wp=$!
@@ -93,7 +93,7 @@ run_setup_ps1_timeout() {
 
 run_setup_ps1_with_move_failure() {
   agent="$1"
-  (cd "$SANDBOX/project" && HOME="$HOME" SETUP_AGENT="$agent" SETUP_PS1_PATH="$REPO_ROOT/src/scripts/setup-mcp.ps1" pwsh -NoProfile -Command '
+  (cd "$SANDBOX/project" && HOME="$HOME" SETUP_AGENT="$agent" SETUP_PS1_PATH="$REPO_ROOT/skills/chromeagent/scripts/setup-mcp.ps1" pwsh -NoProfile -Command '
     function Move-Item {
       param([string]$LiteralPath, [string]$Destination, [switch]$Force)
       throw "injected move failure"

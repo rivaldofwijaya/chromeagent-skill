@@ -24,5 +24,5 @@ body:
     attributes:
       label: Scope
       options:
-        - label: This changes the documented behaviour in src/SKILL.md
+        - label: This changes the documented behaviour in skills/chromeagent/SKILL.md
         - label: This adds a new dependency or external tool

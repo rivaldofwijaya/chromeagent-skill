@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Run `src/scripts/preflight.sh` (or `src/scripts/preflight.ps1`) first and paste its output below —
+        Run `skills/chromeagent/scripts/preflight.sh` (or `skills/chromeagent/scripts/preflight.ps1`) first and paste its output below —
         it reports the port and profile it actually used, which answers most questions up front.
   - type: textarea
     id: what-happened

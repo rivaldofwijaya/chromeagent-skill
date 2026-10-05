@@ -20,11 +20,18 @@ cookies, logins, and tabs you already have open, through the
 git clone https://github.com/rivaldofwijaya/chromeagent-skill.git
 ```
 
-Copy **`src/`** into your agent's skills location, renaming it to `chromeagent-skill` — `src/` is
-the installable skill, and everything else in this repository is development scaffolding:
+As a Claude Code plugin:
 
 ```bash
-cp -R chromeagent-skill/src ~/.claude/skills/chromeagent-skill
+claude plugin marketplace add rivaldofwijaya/chromeagent-skill
+claude plugin install chromeagent@chromeagent-skill
+```
+
+Or copy **`skills/chromeagent/`** into your agent's skills location, renaming it to `chromeagent-skill`.
+That folder is the installable skill, and everything else in this repository is development scaffolding:
+
+```bash
+cp -R chromeagent-skill/skills/chromeagent ~/.claude/skills/chromeagent-skill
 ```
 
 Then replace the placeholder paths below and run setup from your project root:
@@ -172,18 +179,19 @@ destructive, irreversible, or outward-facing actions.
 ## Repository layout
 
 ```
-src/              the skill itself — SKILL.md, references/, and the scripts users run
-dev/tests/        the hermetic suite
-dev/docs/specs/   records of implemented work
-dev/docs/         other development notes
-dev/scripts/      development-only scripts
-dev/tools/        development-only tooling
-dev/reports/      generated reports
-dev/examples/     worked examples
+skills/chromeagent/  the skill itself — SKILL.md, references/, and the scripts users run
+.claude-plugin/      plugin and marketplace manifests
+dev/tests/           the hermetic suite
+dev/docs/specs/      records of implemented work
+dev/docs/            other development notes
+dev/scripts/         development-only scripts
+dev/tools/           development-only tooling
+dev/reports/         generated reports
+dev/examples/        worked examples
 ```
 
-Only `src/` ships. Paths inside `SKILL.md` are written as they resolve **after** install, so
-`/path/to/chromeagent-skill/scripts/preflight.sh` refers to `src/scripts/preflight.sh` in this
+Only `skills/chromeagent/` ships, plus the manifests in `.claude-plugin/` for plugin installs. Paths inside `SKILL.md` are written as they resolve **after** install, so
+`/path/to/chromeagent-skill/scripts/preflight.sh` refers to `skills/chromeagent/scripts/preflight.sh` in this
 repository.
 
 ## Tests

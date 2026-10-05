@@ -2,5 +2,6 @@
 *                       @rivaldofwijaya
 
 # The shipped skill and the suite that guards it move together.
-/src/                   @rivaldofwijaya
+/skills/                @rivaldofwijaya
+/.claude-plugin/        @rivaldofwijaya
 /dev/tests/             @rivaldofwijaya
