@@ -24,9 +24,8 @@ nothing has changed.
 
 ## 2. Preflight
 
-For project-scoped targets, the following working-directory rule applies. Both setup scripts resolve paths relative to the current working directory, so run them from the project root; the skill's own directory is never the right place. Invoke the scripts by their absolute path from the project-root shell. If the working directory cannot be the project root, use `--out-dir <dir>` (or `-OutDir <dir>`) as the explicit output override. Preflight scans config paths relative to its own current working directory and has no `--out-dir`/`-OutDir` override. If setup writes elsewhere, run preflight from that output directory; otherwise it reports `NOT_CONFIGURED` even though the config exists.
-
-Replace the placeholder paths below with your project root and the installed skill directory.
+`/path/to/chromeagent-skill` below stands for this skill's own directory, the one holding this file.
+Run the scripts by that absolute path from a shell sitting in the project root:
 
 ```bash
 cd /path/to/your/project
@@ -37,18 +36,14 @@ Set-Location /path/to/your/project
 pwsh -File /path/to/chromeagent-skill/scripts/preflight.ps1  # native Windows
 ```
 
-The two paths are different directories, and that is the whole trap: the shell sits in the project,
-while the script path points into the installed skill. Worked example for a project at
-`~/code/acme-web` and a skill installed at `~/.claude/skills/chromeagent-skill`:
+The two are different directories, and that is the whole trap. Preflight scans for config relative
+to its working directory, and setup writes there, so a shell left in the skill's directory reports
+`NOT_CONFIGURED` and sends setup's write to the wrong place. When the shell cannot sit in the
+project root, give setup `--out-dir <dir>` (`-OutDir <dir>`) and run preflight from that same
+directory; preflight has no such flag.
 
-```bash
-cd ~/code/acme-web                                              # the CWD preflight scans for config
-sh ~/.claude/skills/chromeagent-skill/scripts/preflight.sh      # where the scripts actually live
-```
-
-Both print `KEY=value` lines ending in exactly one `STATUS=`. Preflight reports local runner, Chrome,
-config, and browser/debug state; it does not test whether this agent session has loaded the MCP tools.
-The complete 15-key output contract, in exact order, is:
+Both print `KEY=value` lines ending in exactly one `STATUS=`, describing local runner, Chrome, config,
+and browser/debug state. The complete 15-key output contract, in exact order, is:
 
 `PLATFORM`, `RUNNER`, `RUNNER_CMD`, `CHROME_PATH`, `CHROME_CHANNEL`, `CHROME_VERSION`, `CHROME_MAJOR`, `CHROME_OK`, `USER_DATA_DIR`, `CHROME_RUNNING`, `DEBUG_PORT`, `DEBUG_REACHABLE`, `MCP_CONFIG_FILE`, `MCP_CONFIGURED`, `STATUS`.
 
@@ -64,7 +59,7 @@ Read the `STATUS` and branch. Verdict precedence is first failing check wins: `N
 | STATUS | Do this |
 |---|---|
 | `READY` | If the `chrome-devtools` tools are present, say nothing: `list_pages` → pick the tab (§5) → the user's task. If the tools are absent, do not call `list_pages` yet: the config may have just been written, so reload/restart the MCP connection, wait for the tools to appear, then continue. |
-| `NOT_CONFIGURED` | Pick the setup target for the host you are actually running in, then run setup without asking. Under Claude Code or OpenCode use `--agent auto` (`-Agent auto`), which reads markers in the output directory to choose between them. Under Codex use `--agent codex` (`-Agent codex`), which writes the user's global `~/.codex/config.toml`: say so before running it; `auto` never writes it, so following the `auto` branch under Codex configures a consumer that is not running. POSIX: `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent <target>`; native Windows: `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent <target>`. Under `auto` the command writes into the current working directory, which must be the project root unless an explicit output directory is supplied. If `CHROME_CHANNEL` is not `stable`, or setup exits non-zero, read `references/setup.md` first: it has the channel flag, the exit codes, and the merge rules. On successful setup the config was just written; reload/restart the MCP connection before calling any tool, because MCP config is read at startup. |
+| `NOT_CONFIGURED` | Pick the setup target for the host you are actually running in, then run setup without asking. Under Claude Code or OpenCode use `--agent auto` (`-Agent auto`), which reads markers in the output directory to choose between them. Under Codex use `--agent codex` (`-Agent codex`), which writes the user's global `~/.codex/config.toml`: say so before running it; `auto` never writes it, so following the `auto` branch under Codex configures a consumer that is not running. POSIX: `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent <target>`; native Windows: `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent <target>`. If `CHROME_CHANNEL` is not `stable`, or setup exits non-zero, read `references/setup.md` first: it has the channel flag, the exit codes, and the merge rules. On successful setup the config was just written; reload/restart the MCP connection before calling any tool, because MCP config is read at startup. |
 | `NEEDS_OPT_IN` | Stop. One instruction: "Open `chrome://inspect/#remote-debugging` in Chrome and click Allow." Then re-run preflight. |
 | `CHROME_NOT_RUNNING` | Ask the user to open Chrome normally, then re-run preflight. |
 | `CHROME_TOO_OLD` | Report the actual `CHROME_VERSION` found and that `--autoConnect` needs Chrome 144+. Offer the fallbacks below as an explicit choice. |
@@ -93,7 +88,7 @@ You are driving the user's live browser, not a scratch one.
   by its position in the list. When more than one tab could be the right one, name the candidates and
   ask instead of guessing. Page tools take that tab's `pageId` (the server default); pass it rather
   than relying on `select_page`, which only sets the target for calls without one. Don't spray new tabs.
-- Close only tabs you opened. A tab the user already had open is theirs: close it only when the user asks for that tab, and name the tab you are closing so they can stop you if it is the wrong one. §6's confirm-first entry is how you obtain that request when the user has not already made it; this bullet says which tab the rule is about, not a second gate.
+- Close only tabs you opened. A tab the user already had open is theirs: close it only when the user asks for that tab, and name the tab you are closing so they can stop you if it is the wrong one. When they have not asked, closing it is §6's confirm-first case.
 - Leave the browser as you found it: no clearing storage, no signing out, no changing settings as a
   side effect.
 - After any navigation, reload, or action that re-renders the page, take a fresh `take_snapshot` before reusing any element reference. A reference from an earlier snapshot can now point at a
