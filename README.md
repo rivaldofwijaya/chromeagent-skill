@@ -98,7 +98,7 @@ current project, from `~/.claude.json`; that check needs Node.
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@1.12.0", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations"]
+      "args": ["-y", "chrome-devtools-mcp@1.12.0", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations", "--no-usage-statistics"]
     }
   }
 }
@@ -116,7 +116,7 @@ arguments.
     "chrome-devtools": {
       "type": "local",
       "enabled": true,
-      "command": ["npx", "-y", "chrome-devtools-mcp@1.12.0", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations"]
+      "command": ["npx", "-y", "chrome-devtools-mcp@1.12.0", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations", "--no-usage-statistics"]
     }
   }
 }
@@ -129,7 +129,7 @@ this touches your **global** Codex config. Use the explicit `setup-mcp.sh --agen
 `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent codex`) when you want to update it:
 
 ```bash
-codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@1.12.0 --autoConnect --redactNetworkHeaders --no-performance-crux --no-file-navigations
+codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@1.12.0 --autoConnect --redactNetworkHeaders --no-performance-crux --no-file-navigations --no-usage-statistics
 ```
 
 That produces:
@@ -137,7 +137,7 @@ That produces:
 ```toml
 [mcp_servers.chrome-devtools]
 command = "npx"
-args = ["-y", "chrome-devtools-mcp@1.12.0", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations"]
+args = ["-y", "chrome-devtools-mcp@1.12.0", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations", "--no-usage-statistics"]
 ```
 
 ### VS Code config (`.vscode/mcp.json`)
@@ -151,7 +151,7 @@ stdio is the default.
   "servers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@1.12.0", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations"]
+      "args": ["-y", "chrome-devtools-mcp@1.12.0", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations", "--no-usage-statistics"]
     }
   }
 }
@@ -187,6 +187,7 @@ Every config, the plugin's included, pins `chrome-devtools-mcp@1.12.0` rather th
 `--redactNetworkHeaders` is on by default, and so is `--no-performance-crux`, which stops performance
 traces from sending the traced URLs to Google's CrUX API. `--no-file-navigations` is also on by default:
 the agent cannot open `file:` URLs, so a page cannot talk it into reading local files through the browser.
+`--no-usage-statistics` stops the server sending Google usage data about the agent's tool calls.
 The skill's policy requires explicit approval before
 reading credentials, cookies, tokens, payment details, or private messages, and confirmation before
 destructive, irreversible, or outward-facing actions.

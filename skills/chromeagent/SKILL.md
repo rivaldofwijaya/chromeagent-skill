@@ -155,6 +155,7 @@ The real profile means every logged-in session is reachable.
 - The default config also carries `--no-file-navigations`, so `new_page` and `navigate_page` reject
   `file:` URLs. Drop it only when the user asks you to open a local file in the browser, and note the
   change when you do.
+- The default config also carries `--no-usage-statistics`, so the server sends Google no usage data.
 - Say once, at first setup, that attaching to the real profile exposes logged-in sessions to you and
   to page content. Don't repeat it every run.
 

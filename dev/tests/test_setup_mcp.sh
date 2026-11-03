@@ -22,7 +22,7 @@ assert_contains '"chrome-devtools"' "$body"
 assert_contains 'chrome-devtools-mcp@1.12.0' "$body"
 assert_contains '\-\-autoConnect' "$body"
 assert_contains '\-\-redactNetworkHeaders' "$body"
-if printf '%s\n' "$body" | grep -q -- '"--autoConnect".*"--redactNetworkHeaders".*"--no-performance-crux".*"--no-file-navigations"'; then
+if printf '%s\n' "$body" | grep -q -- '"--autoConnect".*"--redactNetworkHeaders".*"--no-performance-crux".*"--no-file-navigations".*"--no-usage-statistics"'; then
   _ok "default flags are ordered"
 else
   _fail "default flags are out of order"
@@ -151,6 +151,7 @@ assert_contains '\-\-autoConnect' "$body"
 assert_not_contains 'redactNetworkHeaders' "$body"
 assert_contains 'no-performance-crux' "$body"
 assert_contains 'no-file-navigations' "$body"
+assert_contains 'no-usage-statistics' "$body"
 
 test_case "setup claude: --channel adds the channel flag"
 stub_cmd uname 'echo Darwin'
@@ -160,7 +161,7 @@ rc=$?
 assert_setup_rc 0 "$rc"
 body=$(cat "$SANDBOX/project/.mcp.json")
 assert_contains '\-\-channel' "$body"
-if printf '%s\n' "$body" | grep -q -- '"--no-file-navigations", "--channel", "beta"'; then
+if printf '%s\n' "$body" | grep -q -- '"--no-usage-statistics", "--channel", "beta"'; then
   _ok "channel follows the default flags"
 else
   _fail "channel does not follow the default flags"
