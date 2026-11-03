@@ -229,15 +229,15 @@ for expected in \
   '"mcp": {' \
   '"type": "local",' \
   '"enabled": true,' \
-  '"command": ["npx", "-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations"]' \
+  '"command": ["npx", "-y", "chrome-devtools-mcp@1.12.0", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations"]' \
   '### Codex config (`~/.codex/config.toml`)' \
-  'codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest --autoConnect --redactNetworkHeaders --no-performance-crux --no-file-navigations' \
+  'codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@1.12.0 --autoConnect --redactNetworkHeaders --no-performance-crux --no-file-navigations' \
   '[mcp_servers.chrome-devtools]' \
   '### VS Code config (`.vscode/mcp.json`)' \
   'VS Code uses a top-level `servers` object, not `mcpServers`.' \
   '"servers": {' \
   '`type: "stdio"` is optional because' \
-  '"args": ["-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations"]' \
+  '"args": ["-y", "chrome-devtools-mcp@1.12.0", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations"]' \
   'sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto' \
   'pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto' \
   'Flags: `--runner "<argv>"`' \

@@ -49,6 +49,9 @@ sandbox_new() {
   # preflight reads Claude Code's config from here when it is set; a host value
   # would point the probe at the developer's real ~/.claude.json.
   unset CLAUDE_CONFIG_DIR 2>/dev/null || true
+  # Claude Code sets this in its shells, and under it preflight counts the
+  # plugin manifest beside the scripts; a run from inside a session must not.
+  unset CLAUDECODE 2>/dev/null || true
 }
 
 # stub_cmd NAME BODY  — create a fake executable on the sandbox PATH.

@@ -37,7 +37,9 @@ Update Chrome (Menu → Help → About Google Chrome), or use a fallback:
 No `chrome-devtools` entry with `--autoConnect` in any scanned config. Choose the target for the current host: `auto` for Claude Code or OpenCode, `codex` for Codex. Codex writes global `~/.codex/config.toml`; announce that scope before setup. Run `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent <target>`, then **restart your agent**. MCP config is read at startup.
 On native Windows, use `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent <target>` instead. Pass any reported beta/dev/canary channel as described in `references/setup.md`.
 
-Scanned, in order: `./.mcp.json`, `./.vscode/mcp.json`, `./.cursor/mcp.json`, `./opencode.json`,
+Under Claude Code (`CLAUDECODE=1`), a plugin install counts first: the plugin's own
+`.claude-plugin/plugin.json` provides the server, so no config file exists to find. Then scanned, in
+order: `./.mcp.json`, `./.vscode/mcp.json`, `./.cursor/mcp.json`, `./opencode.json`,
 `./.codex/config.toml`, `~/.codex/config.toml`, `~/.config/opencode/opencode.json`, then Claude Code's
 `~/.claude.json` (or `$CLAUDE_CONFIG_DIR/.claude.json`): its user-scope servers, and its local-scope
 servers for the current directory only, as `claude mcp add -s user` and `claude mcp add` write them.
@@ -114,7 +116,7 @@ If the tools still do not appear, the server may be exiting at startup, which pr
 - **Startup timeout under Codex on Windows.** The first `npx` run downloads the package and can
   outlast Codex's default 10-second MCP startup timeout. Add `startup_timeout_sec = 20` under
   `[mcp_servers.chrome-devtools]` in `~/.codex/config.toml`, then restart Codex.
-- **Anything else.** Run `npx chrome-devtools-mcp@latest --help` from the same shell to see whether
+- **Anything else.** Run `npx chrome-devtools-mcp@1.12.0 --help` from the same shell to see whether
   the server starts at all.
 
 ### Other `READY` checks
@@ -156,8 +158,8 @@ deliberately debugging auth headers, and be aware the agent will then see them.
 
 That is `--no-file-navigations`, on by default, so the agent cannot open local files in the browser. To
 allow it, remove the flag from the `chrome-devtools` entry by hand and restart the agent. The flag
-needs `chrome-devtools-mcp` 1.11 or newer, which `@latest` always is; a config pinned to an older
-version may fail to start with it.
+needs `chrome-devtools-mcp` 1.11 or newer; setup pins 1.12.0, and a hand-written config pinned to an
+older version may fail to start with it.
 
 ## Performance traces show no field data
 

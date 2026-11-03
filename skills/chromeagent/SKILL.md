@@ -10,7 +10,9 @@ set up; the whole point of this skill is to reach the user's task without ceremo
 
 ## 1. Fast path: try first, do not probe
 
-If `chrome-devtools` MCP tools are present in this session, call `list_pages` immediately.
+If `chrome-devtools` MCP tools are present in this session, call `list_pages` immediately. Installed
+as the Claude Code plugin, the plugin provides the server, its tools are named
+`mcp__plugin_chromeagent_chrome-devtools__*`, and there is never a setup step to run.
 
 That call only succeeds when config, Chrome version, and the `chrome://inspect` opt-in are all
 already good, so it **is** the check. On success: say nothing about setup, pick the tab the user already

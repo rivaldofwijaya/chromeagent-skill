@@ -10,6 +10,7 @@ set -u
 
 CHROME_MIN_MAJOR=144
 ROOT="${CHROMEAGENT_ROOT:-}"
+SCRIPT_DIR=$(cd "$(dirname "$0")" 2>/dev/null && pwd)
 
 detect_platform() {
   if [ -n "${CHROMEAGENT_PLATFORM:-}" ]; then
@@ -155,6 +156,18 @@ find_chrome() {
 # Prints the path of the first config that configures chrome-devtools with
 # --autoConnect. Prints nothing when none does.
 scan_config() {
+  # Installed as a Claude Code plugin, the plugin's own manifest provides the
+  # server and no config file is written. It counts only under Claude Code
+  # (CLAUDECODE=1): another agent running these scripts from a clone does not
+  # read that manifest.
+  if [ "${CLAUDECODE:-}" = 1 ]; then
+    f="$SCRIPT_DIR/../../../.claude-plugin/plugin.json"
+    if [ -f "$f" ] && grep -q 'chrome-devtools' "$f" 2>/dev/null &&
+       grep -q 'autoConnect' "$f" 2>/dev/null; then
+      printf '%s\n' "$(cd "$(dirname "$f")" && pwd)/plugin.json"
+      return 0
+    fi
+  fi
   for f in \
     "./.mcp.json" \
     "./.vscode/mcp.json" \
