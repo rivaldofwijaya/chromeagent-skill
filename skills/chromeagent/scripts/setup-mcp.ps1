@@ -240,6 +240,9 @@ function Get-ServerArgs {
   # Performance traces otherwise send the traced URLs to the CrUX API; with a
   # real profile those URLs can be private.
   $argsList += '--no-performance-crux'
+  # Navigations the agent performs cannot open file: URLs, so a page that
+  # talks the agent into it cannot read local files through the browser.
+  $argsList += '--no-file-navigations'
   if ($Channel) { $argsList += @('--channel', $Channel) }
   return @($argsList)
 }

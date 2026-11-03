@@ -152,6 +152,13 @@ If the tools still do not appear, the server may be exiting at startup, which pr
 That is `--redactNetworkHeaders`, on by default. Re-run setup with `--no-redact` only when you are
 deliberately debugging auth headers, and be aware the agent will then see them.
 
+## A `file:` URL is rejected
+
+That is `--no-file-navigations`, on by default, so the agent cannot open local files in the browser. To
+allow it, remove the flag from the `chrome-devtools` entry by hand and restart the agent. The flag
+needs `chrome-devtools-mcp` 1.11 or newer, which `@latest` always is; a config pinned to an older
+version may fail to start with it.
+
 ## Performance traces show no field data
 
 That is `--no-performance-crux`, on by default, so traces do not send the traced URLs to Google's CrUX

@@ -144,6 +144,7 @@ assert_contains 'chrome-devtools' "$body"
 assert_contains 'autoConnect' "$body"
 assert_contains 'redactNetworkHeaders' "$body"
 assert_contains 'no-performance-crux' "$body"
+assert_contains 'no-file-navigations' "$body"
 
 test_case "ps1 setup: -OutDir writes into the named directory, not cwd"
 link_host_tool pwsh
@@ -395,6 +396,7 @@ run_setup_ps1 -Agent claude -NoRedact >/dev/null
 body=$(cat "$SANDBOX/project/.mcp.json" 2>/dev/null || true)
 assert_not_contains 'redactNetworkHeaders' "$body"
 assert_contains 'no-performance-crux' "$body"
+assert_contains 'no-file-navigations' "$body"
 
 test_case "ps1 setup: merges into an existing .mcp.json"
 link_host_tool pwsh
@@ -433,12 +435,14 @@ assert_contains 'beta' "$body"
 auto_line=$(printf '%s\n' "$body" | grep -n -- '"--autoConnect"' | sed -n '1p' | sed 's/:.*//')
 redact_line=$(printf '%s\n' "$body" | grep -n -- '"--redactNetworkHeaders"' | sed -n '1p' | sed 's/:.*//')
 crux_line=$(printf '%s\n' "$body" | grep -n -- '"--no-performance-crux"' | sed -n '1p' | sed 's/:.*//')
+filenav_line=$(printf '%s\n' "$body" | grep -n -- '"--no-file-navigations"' | sed -n '1p' | sed 's/:.*//')
 channel_line=$(printf '%s\n' "$body" | grep -n -- '"--channel"' | sed -n '1p' | sed 's/:.*//')
-if [ -n "$auto_line" ] && [ -n "$redact_line" ] && [ -n "$crux_line" ] && [ -n "$channel_line" ] &&
-   [ "$auto_line" -lt "$redact_line" ] && [ "$redact_line" -lt "$crux_line" ] && [ "$crux_line" -lt "$channel_line" ]; then
+if [ -n "$auto_line" ] && [ -n "$redact_line" ] && [ -n "$crux_line" ] && [ -n "$filenav_line" ] && [ -n "$channel_line" ] &&
+   [ "$auto_line" -lt "$redact_line" ] && [ "$redact_line" -lt "$crux_line" ] &&
+   [ "$crux_line" -lt "$filenav_line" ] && [ "$filenav_line" -lt "$channel_line" ]; then
   _ok "default flags precede channel"
 else
-  _fail "default flag order was auto=$auto_line redact=$redact_line crux=$crux_line channel=$channel_line"
+  _fail "default flag order was auto=$auto_line redact=$redact_line crux=$crux_line filenav=$filenav_line channel=$channel_line"
 fi
 
 test_case "ps1 setup: a bad -Agent value exits 2"

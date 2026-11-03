@@ -99,7 +99,8 @@ You are driving the user's live browser, not a scratch one.
   `includeSnapshot: true` to the input action instead of making a second call.
 - Read with `take_snapshot`; screenshot only when layout or visual state actually matters. Send a
   large snapshot, screenshot, or trace to `filePath` instead of into the conversation, unless the
-  page holds the sensitive data in §7.
+  page holds the sensitive data in §7. The server only writes inside the workspace roots the agent
+  reports and the OS temp directory; if it rejects a path, write under the temp directory instead.
 - Verify the requested outcome from what the page now shows — the URL, the confirmation, the
   changed row — not from the fact that a tool call returned without error.
 
@@ -149,6 +150,9 @@ The real profile means every logged-in session is reachable.
 - The default config also carries `--no-performance-crux`, so a performance trace does not send the
   traced URLs to Google's CrUX API. Drop it only when the user asks for field data, and say that the
   traced URLs will leave the machine.
+- The default config also carries `--no-file-navigations`, so `new_page` and `navigate_page` reject
+  `file:` URLs. Drop it only when the user asks you to open a local file in the browser, and note the
+  change when you do.
 - Say once, at first setup, that attaching to the real profile exposes logged-in sessions to you and
   to page content. Don't repeat it every run.
 

@@ -229,15 +229,15 @@ for expected in \
   '"mcp": {' \
   '"type": "local",' \
   '"enabled": true,' \
-  '"command": ["npx", "-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux"]' \
+  '"command": ["npx", "-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations"]' \
   '### Codex config (`~/.codex/config.toml`)' \
-  'codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest --autoConnect --redactNetworkHeaders --no-performance-crux' \
+  'codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest --autoConnect --redactNetworkHeaders --no-performance-crux --no-file-navigations' \
   '[mcp_servers.chrome-devtools]' \
   '### VS Code config (`.vscode/mcp.json`)' \
   'VS Code uses a top-level `servers` object, not `mcpServers`.' \
   '"servers": {' \
   '`type: "stdio"` is optional because' \
-  '"args": ["-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux"]' \
+  '"args": ["-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations"]' \
   'sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto' \
   'pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto' \
   'Flags: `--runner "<argv>"`' \
@@ -365,9 +365,19 @@ setup=$(cat "$REPO_ROOT/skills/chromeagent/references/setup.md")
 troubleshooting=$(cat "$REPO_ROOT/skills/chromeagent/references/troubleshooting.md")
 readme=$(cat "$REPO_ROOT/README.md")
 skill_assert_fixed '`--no-performance-crux`' "$skill"
-skill_assert_fixed 'The setup defaults are exactly `--autoConnect`, `--redactNetworkHeaders`, `--no-performance-crux`, in' "$setup"
+skill_assert_fixed 'The setup defaults are exactly `--autoConnect`, `--redactNetworkHeaders`, `--no-performance-crux`,' "$setup"
 skill_assert_fixed '## Performance traces show no field data' "$troubleshooting"
 skill_assert_fixed '`--no-performance-crux`, which stops performance' "$readme"
+
+test_case "docs: the file-navigation default is documented where it applies"
+skill=$(sed -n '/^## 7\. Sensitive data/,/^## Reference/p' "$REPO_ROOT/skills/chromeagent/SKILL.md")
+setup=$(cat "$REPO_ROOT/skills/chromeagent/references/setup.md")
+troubleshooting=$(cat "$REPO_ROOT/skills/chromeagent/references/troubleshooting.md")
+readme=$(cat "$REPO_ROOT/README.md")
+skill_assert_fixed '`--no-file-navigations`' "$skill"
+skill_assert_fixed '`--no-file-navigations`, in that order' "$setup"
+skill_assert_fixed '## A `file:` URL is rejected' "$troubleshooting"
+skill_assert_fixed '`--no-file-navigations` is also on by default' "$readme"
 
 test_case "docs: troubleshooting covers a server that exits at startup"
 body=$(cat "$REPO_ROOT/skills/chromeagent/references/troubleshooting.md")

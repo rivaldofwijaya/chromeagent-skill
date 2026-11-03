@@ -111,6 +111,9 @@ mcp_args() {
   # Performance traces otherwise send the traced URLs to the CrUX API; with a
   # real profile those URLs can be private.
   printf ' --no-performance-crux'
+  # Navigations the agent performs cannot open file: URLs, so a page that
+  # talks the agent into it cannot read local files through the browser.
+  printf ' --no-file-navigations'
   [ -n "$CHANNEL" ] && printf ' --channel %s' "$CHANNEL"
   printf '\n'
 }
