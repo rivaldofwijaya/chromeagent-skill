@@ -639,3 +639,16 @@ else
   _ok "USER_DATA_DIR has no backslash"
 fi
 unset LOCALAPPDATA
+
+test_case "chrome: the windows version lookup survives a quote in the path"
+stub_cmd uname 'echo MINGW64_NT-10.0'
+stub_cmd npx 'exit 0'
+ProgramFiles="C:/Program Files/O'Brien"
+export ProgramFiles
+fake_chrome "${CHROMEAGENT_ROOT}C:/Program Files/O'Brien/Google/Chrome/Application/chrome.exe" "x"
+# Answers only when the path arrives intact through the environment.
+stub_cmd powershell.exe '[ -f "$CHROMEAGENT_EXE" ] && printf "145.0.7300.20\r\n"'
+out=$(run_preflight)
+unset ProgramFiles
+assert_kv CHROME_VERSION 145.0.7300.20 "$out"
+assert_kv CHROME_MAJOR 145 "$out"
