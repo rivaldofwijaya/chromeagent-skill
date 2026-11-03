@@ -30,32 +30,31 @@ function Get-RawArguments {
 # Pass the automatic raw argv array explicitly so the collector also receives
 # the -- token that pwsh -File otherwise treats as a parameter terminator.
 $rawArguments = @(Get-RawArguments -RawArguments @($args))
-$Agent = 'auto'
-$Runner = ''
-$Channel = ''
-$ChannelSet = $false
-$NoRedact = $false
-$OutDir = ''
-$OutDirSet = $false
-$seenOptions = @{}
 
 function Write-Usage {
   Write-Info 'usage: setup-mcp.ps1 -Agent auto|claude|codex|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact]'
 }
 
+function Stop-Usage([string]$Message) {
+  Write-ErrorLine "setup-mcp: $Message"
+  exit 2
+}
+
 # Parse by index. Every non-exit path advances by one or two positions, so a
-# malformed trailing value can never leave the loop at the same index.
+# malformed trailing value can never leave the loop at the same index. Each
+# option is accepted once, as -Name value or -Name:value.
+$values = @{}
+$NoRedact = $false
+$noRedactSeen = $false
 $index = 0
 while ($index -lt $rawArguments.Count) {
   $option = [string]$rawArguments[$index]
   $optionName = $option
   $attachedValue = $null
-  $hasAttachedValue = $false
   $colon = $option.IndexOf(':')
   if ($colon -gt 1) {
     $optionName = $option.Substring(0, $colon)
     $attachedValue = $option.Substring($colon + 1)
-    $hasAttachedValue = $true
   }
 
   if (($optionName -ieq '-h') -or ($optionName -ieq '--help')) {
@@ -63,129 +62,51 @@ while ($index -lt $rawArguments.Count) {
     exit 0
   }
 
-  if ($optionName -ieq '-Agent') {
-    if ($seenOptions.ContainsKey('Agent')) {
-      Write-ErrorLine "setup-mcp: repeated option $option"
-      exit 2
-    }
-    $seenOptions['Agent'] = $true
-    if ($hasAttachedValue) {
-      if ($attachedValue.Length -eq 0) {
-        Write-ErrorLine "setup-mcp: $option requires a value"
-        exit 2
-      }
-      $Agent = $attachedValue
+  $key = @('Agent', 'Runner', 'Channel', 'OutDir') | Where-Object { $optionName -ieq "-$_" } | Select-Object -First 1
+  if ($key) {
+    # -OutDir errors name the option canonically; the others echo the token.
+    $label = if ($key -eq 'OutDir') { '-OutDir' } else { $option }
+    if ($values.ContainsKey($key)) { Stop-Usage "repeated option $label" }
+    if ($null -ne $attachedValue) {
+      if ($attachedValue.Length -eq 0) { Stop-Usage "$label requires a value" }
+      $value = $attachedValue
       $index += 1
     } elseif (($index + 1) -ge $rawArguments.Count) {
-      Write-ErrorLine "setup-mcp: $option requires a value"
-      exit 2
+      Stop-Usage "$label requires a value"
     } else {
-      $Agent = [string]$rawArguments[$index + 1]
+      $value = [string]$rawArguments[$index + 1]
+      if (($key -eq 'OutDir') -and ($value.Length -eq 0)) { Stop-Usage "$label requires a value" }
       $index += 2
     }
-    continue
-  }
-
-  if ($optionName -ieq '-Runner') {
-    if ($seenOptions.ContainsKey('Runner')) {
-      Write-ErrorLine "setup-mcp: repeated option $option"
-      exit 2
-    }
-    $seenOptions['Runner'] = $true
-    if ($hasAttachedValue) {
-      if ($attachedValue.Length -eq 0) {
-        Write-ErrorLine "setup-mcp: $option requires a value"
-        exit 2
-      }
-      $Runner = $attachedValue
-      $index += 1
-    } elseif (($index + 1) -ge $rawArguments.Count) {
-      Write-ErrorLine "setup-mcp: $option requires a value"
-      exit 2
-    } else {
-      $Runner = [string]$rawArguments[$index + 1]
-      $index += 2
-    }
-    continue
-  }
-
-  if ($optionName -ieq '-Channel') {
-    if ($seenOptions.ContainsKey('Channel')) {
-      Write-ErrorLine "setup-mcp: repeated option $option"
-      exit 2
-    }
-    $seenOptions['Channel'] = $true
-    $ChannelSet = $true
-    if ($hasAttachedValue) {
-      if ($attachedValue.Length -eq 0) {
-        Write-ErrorLine "setup-mcp: $option requires a value"
-        exit 2
-      }
-      $Channel = $attachedValue
-      $index += 1
-    } elseif (($index + 1) -ge $rawArguments.Count) {
-      Write-ErrorLine "setup-mcp: $option requires a value"
-      exit 2
-    } else {
-      $Channel = [string]$rawArguments[$index + 1]
-      $index += 2
-    }
-    continue
-  }
-
-  if ($optionName -ieq '-OutDir') {
-    if ($seenOptions.ContainsKey('OutDir')) {
-      Write-ErrorLine 'setup-mcp: repeated option -OutDir'
-      exit 2
-    }
-    $seenOptions['OutDir'] = $true
-    $OutDirSet = $true
-    if ($hasAttachedValue) {
-      if ($attachedValue.Length -eq 0) {
-        Write-ErrorLine 'setup-mcp: -OutDir requires a value'
-        exit 2
-      }
-      $OutDir = $attachedValue
-      $index += 1
-    } elseif (($index + 1) -ge $rawArguments.Count) {
-      Write-ErrorLine 'setup-mcp: -OutDir requires a value'
-      exit 2
-    } else {
-      $OutDir = [string]$rawArguments[$index + 1]
-      if ($OutDir.Length -eq 0) {
-        Write-ErrorLine 'setup-mcp: -OutDir requires a value'
-        exit 2
-      }
-      $index += 2
-    }
+    $values[$key] = $value
     continue
   }
 
   if ($optionName -ieq '-NoRedact') {
-    if ($seenOptions.ContainsKey('NoRedact')) {
-      Write-ErrorLine "setup-mcp: repeated option $option"
-      exit 2
-    }
-    $seenOptions['NoRedact'] = $true
-    if ($hasAttachedValue) {
-      if (@('true', '$true') -contains $attachedValue) {
-        $NoRedact = $true
-      } elseif (@('false', '$false') -contains $attachedValue) {
-        $NoRedact = $false
-      } else {
-        Write-ErrorLine "setup-mcp: invalid value for $option"
-        exit 2
-      }
-    } else {
+    if ($noRedactSeen) { Stop-Usage "repeated option $option" }
+    $noRedactSeen = $true
+    if ($null -eq $attachedValue) {
       $NoRedact = $true
+    } elseif (@('true', '$true') -contains $attachedValue) {
+      $NoRedact = $true
+    } elseif (@('false', '$false') -contains $attachedValue) {
+      $NoRedact = $false
+    } else {
+      Stop-Usage "invalid value for $option"
     }
     $index += 1
     continue
   }
 
-  Write-ErrorLine "setup-mcp: unknown option $option"
-  exit 2
+  Stop-Usage "unknown option $option"
 }
+
+$Agent = if ($values.ContainsKey('Agent')) { $values['Agent'] } else { 'auto' }
+$Runner = if ($values.ContainsKey('Runner')) { $values['Runner'] } else { '' }
+$ChannelSet = $values.ContainsKey('Channel')
+$Channel = if ($ChannelSet) { $values['Channel'] } else { '' }
+$OutDirSet = $values.ContainsKey('OutDir')
+$OutDir = if ($OutDirSet) { $values['OutDir'] } else { '' }
 
 # Validate manually so a bad value follows setup-mcp.sh's exit-2 contract.
 if (@('auto', 'claude', 'codex', 'opencode') -cnotcontains $Agent) {
