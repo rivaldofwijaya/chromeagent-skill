@@ -125,9 +125,11 @@ chrome_version() {
   raw=""
   if [ "$2" = windows ]; then
     # The Windows binary does not print --version; ask Windows for the file version.
+    # The path travels in the environment, not spliced into the command, so a
+    # quote in it cannot end the PowerShell string.
     if command -v powershell.exe >/dev/null 2>&1; then
-      raw=$(powershell.exe -NoProfile -Command \
-        "(Get-Item '$1').VersionInfo.ProductVersion" 2>/dev/null | tr -d '\r')
+      raw=$(CHROMEAGENT_EXE="$1" powershell.exe -NoProfile -Command \
+        '(Get-Item -LiteralPath $env:CHROMEAGENT_EXE).VersionInfo.ProductVersion' 2>/dev/null | tr -d '\r')
     fi
   else
     raw=$("$1" --version 2>/dev/null)
@@ -139,9 +141,6 @@ chrome_version() {
 
 # Prints the first found candidate; prints nothing when no candidate is found.
 find_chrome() {
-  CHROME_PATH=none
-  CHROME_CHANNEL=none
-  USER_DATA_DIR=""
   chrome_candidates "$1" | while IFS='|' read -r ch bin udd; do
     [ -n "$bin" ] || continue
     case "$bin" in
@@ -239,18 +238,20 @@ chrome_running() {
   return 1
 }
 
-# debug_port USER_DATA_DIR -> port. Sets PORT_FILE_FOUND to yes|no.
+# debug_port USER_DATA_DIR — sets DEBUG_PORT, and PORT_FILE_FOUND to yes when
+# DevToolsActivePort supplied it. Call it directly, not in $(...), or both
+# assignments are lost with the subshell.
 debug_port() {
   PORT_FILE_FOUND=no
+  DEBUG_PORT=9222
   f="$1/DevToolsActivePort"
   if [ -n "$1" ] && [ -f "$f" ]; then
     p=$(sed -n '1p' "$f" 2>/dev/null | tr -d '\r')
     case "$p" in
       ''|*[!0-9]*) : ;;
-      *) PORT_FILE_FOUND=yes; printf '%s\n' "$p"; return 0 ;;
+      *) PORT_FILE_FOUND=yes; DEBUG_PORT=$p ;;
     esac
   fi
-  printf '9222\n'
 }
 
 # debug_reachable PORT -> yes|optin|no|unknown
@@ -336,15 +337,7 @@ main() {
   if [ -n "$MCP_CONFIG_FILE" ]; then MCP_CONFIGURED=yes; else MCP_CONFIGURED=no; MCP_CONFIG_FILE=none; fi
 
   if chrome_running "$PLATFORM" "$CHROME_PATH"; then CHROME_RUNNING=yes; else CHROME_RUNNING=no; fi
-  PORT_FILE_FOUND=no
-  DEBUG_PORT=$(debug_port "$USER_DATA_DIR")
-  if [ -n "$USER_DATA_DIR" ] && [ -f "$USER_DATA_DIR/DevToolsActivePort" ]; then
-    port_line=$(sed -n '1p' "$USER_DATA_DIR/DevToolsActivePort" 2>/dev/null | tr -d '\r')
-    case "$port_line" in
-      ''|*[!0-9]*) : ;;
-      *) PORT_FILE_FOUND=yes ;;
-    esac
-  fi
+  debug_port "$USER_DATA_DIR"
   if [ "$CHROME_RUNNING" = yes ]; then
     DEBUG_REACHABLE=$(debug_reachable "$DEBUG_PORT")
   else
