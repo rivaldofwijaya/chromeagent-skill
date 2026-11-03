@@ -121,6 +121,8 @@ mcp_args() {
   # Navigations the agent performs cannot open file: URLs, so a page that
   # talks the agent into it cannot read local files through the browser.
   printf ' --no-file-navigations'
+  # Google otherwise collects usage data about the agent's tool calls.
+  printf ' --no-usage-statistics'
   [ -n "$CHANNEL" ] && printf ' --channel %s' "$CHANNEL"
   printf '\n'
 }

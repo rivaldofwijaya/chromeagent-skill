@@ -48,7 +48,7 @@ The help output is:
 `usage: setup-mcp.ps1 -Agent auto|claude|codex|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact]`
 
 The setup defaults are exactly `--autoConnect`, `--redactNetworkHeaders`, `--no-performance-crux`,
-`--no-file-navigations`, in that order; `--no-redact` (or `-NoRedact`) drops the redaction flag, and a channel flag follows those
+`--no-file-navigations`, `--no-usage-statistics`, in that order; `--no-redact` (or `-NoRedact`) drops the redaction flag, and a channel flag follows those
 defaults.
 
 ## Merging an existing config
