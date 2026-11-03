@@ -122,7 +122,37 @@ function Get-ConfigFile {
       if ($t -cmatch 'chrome-devtools' -and $t -cmatch 'autoConnect') { return $p }
     }
   }
+  $claudeDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { $HOME }
+  $claudeJson = Join-Path $claudeDir '.claude.json'
+  if ((Test-Path -LiteralPath $claudeJson) -and (Test-ClaudeConfig $claudeJson)) { return $claudeJson }
   return $null
+}
+
+function Test-ServerMap($servers) {
+  if (-not $servers) { return $false }
+  foreach ($s in $servers.PSObject.Properties) {
+    $t = $s.Name + ($s.Value | ConvertTo-Json -Depth 10 -Compress)
+    if ($t -cmatch 'chrome-devtools' -and $t -cmatch 'autoConnect') { return $true }
+  }
+  return $false
+}
+
+# Mirrors claude_config_has_server in preflight.sh: user scope is the top-level
+# mcpServers, local scope is projects[<cwd>].mcpServers. The file holds every
+# project's local scope, so it is parsed rather than matched as text.
+function Test-ClaudeConfig([string]$path) {
+  try {
+    $doc = Get-Content -LiteralPath $path -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+  } catch { return $false }
+  if (-not $doc) { return $false }
+  if (Test-ServerMap $doc.mcpServers) { return $true }
+  if (-not $doc.projects) { return $false }
+  $here = ((Get-Location).ProviderPath -replace '\\', '/').TrimEnd('/')
+  foreach ($p in $doc.projects.PSObject.Properties) {
+    $key = ($p.Name -replace '\\', '/').TrimEnd('/')
+    if ($key -eq $here -and (Test-ServerMap $p.Value.mcpServers)) { return $true }
+  }
+  return $false
 }
 
 $runner = Get-Runner

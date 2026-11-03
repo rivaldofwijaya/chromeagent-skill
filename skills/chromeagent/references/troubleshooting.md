@@ -38,7 +38,10 @@ No `chrome-devtools` entry with `--autoConnect` in any scanned config. Choose th
 On native Windows, use `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent <target>` instead. Pass any reported beta/dev/canary channel as described in `references/setup.md`.
 
 Scanned, in order: `./.mcp.json`, `./.vscode/mcp.json`, `./.cursor/mcp.json`, `./opencode.json`,
-`./.codex/config.toml`, `~/.codex/config.toml`, `~/.config/opencode/opencode.json`.
+`./.codex/config.toml`, `~/.codex/config.toml`, `~/.config/opencode/opencode.json`, then Claude Code's
+`~/.claude.json` (or `$CLAUDE_CONFIG_DIR/.claude.json`): its user-scope servers, and its local-scope
+servers for the current directory only, as `claude mcp add -s user` and `claude mcp add` write them.
+That last file is parsed with Node, so without Node a server registered only there is not seen.
 
 ## Config was written to the wrong directory
 

@@ -79,6 +79,8 @@ The help output is:
 | VS Code | `./.vscode/mcp.json`, top-level `servers` shape; write it yourself or copy the VS Code snippet | project |
 
 Preflight detects all five locations, so a hand-written Cursor or VS Code config counts as configured.
+It also reads a server registered with `claude mcp add`, at user scope or at local scope for the
+current project, from `~/.claude.json`; that check needs Node.
 
 ### Claude Code / Cursor config (`.mcp.json` / `.cursor/mcp.json`)
 

@@ -70,6 +70,36 @@ unset CHROMEAGENT_FAKE_CHROME
 assert_kv MCP_CONFIGURED no "$out"
 assert_status NOT_CONFIGURED "$out"
 
+test_case "ps1: a user-scope server in ~/.claude.json is detected"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+export CHROMEAGENT_FAKE_CHROME="stable|C:/fake/chrome.exe|145.0.7300.20|C:/fake/UserData"
+printf '%s\n' '{"mcpServers":{"chrome-devtools":{"command":"npx","args":["-y","chrome-devtools-mcp@latest","--autoConnect"]}},"projects":{}}' > "$HOME/.claude.json"
+out=$(run_ps1)
+unset CHROMEAGENT_FAKE_CHROME
+assert_kv MCP_CONFIGURED yes "$out"
+assert_contains 'MCP_CONFIG_FILE=.*\.claude\.json' "$out"
+
+test_case "ps1: a local-scope server for this project in ~/.claude.json is detected"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+export CHROMEAGENT_FAKE_CHROME="stable|C:/fake/chrome.exe|145.0.7300.20|C:/fake/UserData"
+project_dir=$(cd "$SANDBOX/project" && pwd)
+printf '{"mcpServers":{},"projects":{"%s":{"mcpServers":{"chrome-devtools":{"command":"npx","args":["--autoConnect"]}}}}}\n' "$project_dir" > "$HOME/.claude.json"
+out=$(run_ps1)
+unset CHROMEAGENT_FAKE_CHROME
+assert_kv MCP_CONFIGURED yes "$out"
+
+test_case "ps1: another project's local-scope server in ~/.claude.json does not count"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+export CHROMEAGENT_FAKE_CHROME="stable|C:/fake/chrome.exe|145.0.7300.20|C:/fake/UserData"
+printf '%s\n' '{"mcpServers":{},"projects":{"/some/other/project":{"mcpServers":{"chrome-devtools":{"command":"npx","args":["--autoConnect"]}}}}}' > "$HOME/.claude.json"
+out=$(run_ps1)
+unset CHROMEAGENT_FAKE_CHROME
+assert_kv MCP_CONFIGURED no "$out"
+assert_status NOT_CONFIGURED "$out"
+
 run_setup_ps1() {
   (cd "$SANDBOX/project" && HOME="$HOME" pwsh -NoProfile -File "$REPO_ROOT/skills/chromeagent/scripts/setup-mcp.ps1" "$@" 2>&1)
 }

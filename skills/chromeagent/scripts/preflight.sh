@@ -170,7 +170,38 @@ scan_config() {
     printf '%s\n' "$f"
     return 0
   done
+  f="${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json"
+  if [ -f "$f" ] && claude_config_has_server "$f"; then
+    printf '%s\n' "$f"
+    return 0
+  fi
   return 1
+}
+
+# claude_config_has_server FILE — exit 0 when Claude Code's own config registers
+# chrome-devtools with --autoConnect at user scope (top-level mcpServers) or at
+# local scope for this directory (projects[<cwd>].mcpServers). The file holds
+# every project's local scope, so a grep would accept another project's entry;
+# it has to be parsed. Without node the file is not consulted.
+claude_config_has_server() {
+  command -v node >/dev/null 2>&1 || return 1
+  node -e '
+    const fs=require("fs");
+    const [file,...dirs]=process.argv.slice(1);
+    let doc;
+    try{doc=JSON.parse(fs.readFileSync(file,"utf8"))}catch(e){process.exit(1)}
+    if(!doc||typeof doc!=="object")process.exit(1);
+    const win=process.platform==="win32";
+    const norm=p=>{p=String(p).replace(/\\/g,"/").replace(/\/+$/,"");return win?p.toLowerCase():p};
+    const here=new Set(dirs.concat(process.cwd()).map(norm));
+    try{here.add(norm(fs.realpathSync(process.cwd())))}catch(e){}
+    const hit=s=>!!s&&typeof s==="object"&&Object.entries(s).some(([k,v])=>{
+      const t=k+JSON.stringify(v);return t.includes("chrome-devtools")&&t.includes("autoConnect")});
+    if(hit(doc.mcpServers))process.exit(0);
+    for(const [k,p] of Object.entries(doc.projects||{})){
+      if(here.has(norm(k))&&p&&hit(p.mcpServers))process.exit(0)}
+    process.exit(1);
+  ' "$1" "$(pwd)" "$(pwd -P)" >/dev/null 2>&1
 }
 
 # chrome_running PLATFORM CHROME_PATH — exit 0 when that exact binary is running.
