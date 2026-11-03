@@ -46,6 +46,9 @@ sandbox_new() {
   CHROMEAGENT_ROOT="$SANDBOX/root"
   export HOME PATH CHROMEAGENT_ROOT
   unset CHROMEAGENT_PLATFORM 2>/dev/null || true
+  # preflight reads Claude Code's config from here when it is set; a host value
+  # would point the probe at the developer's real ~/.claude.json.
+  unset CLAUDE_CONFIG_DIR 2>/dev/null || true
 }
 
 # stub_cmd NAME BODY  — create a fake executable on the sandbox PATH.

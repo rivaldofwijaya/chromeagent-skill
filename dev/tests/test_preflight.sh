@@ -230,6 +230,67 @@ out=$(run_preflight)
 assert_kv MCP_CONFIGURED no "$out"
 assert_status NOT_CONFIGURED "$out"
 
+# write_claude_json PATH SERVERS_JSON PROJECTS_JSON — a Claude Code ~/.claude.json
+write_claude_json() {
+  mkdir -p "$(dirname "$1")"
+  printf '{"numStartups":3,"mcpServers":%s,"projects":%s}\n' "$2" "$3" > "$1"
+}
+cdm_server='{"chrome-devtools":{"type":"stdio","command":"npx","args":["-y","chrome-devtools-mcp@latest","--autoConnect"]}}'
+
+test_case "config: a user-scope server in ~/.claude.json is detected"
+ready_chrome
+link_host_tool node
+write_claude_json "$HOME/.claude.json" "$cdm_server" '{}'
+out=$(run_preflight)
+assert_kv MCP_CONFIGURED yes "$out"
+assert_kv MCP_CONFIG_FILE "$HOME/.claude.json" "$out"
+
+test_case "config: a local-scope server for this project in ~/.claude.json is detected"
+ready_chrome
+link_host_tool node
+project_dir=$(cd "$SANDBOX/project" && pwd)
+write_claude_json "$HOME/.claude.json" '{}' "{\"$project_dir\":{\"mcpServers\":$cdm_server}}"
+out=$(run_preflight)
+assert_kv MCP_CONFIGURED yes "$out"
+assert_kv MCP_CONFIG_FILE "$HOME/.claude.json" "$out"
+
+test_case "config: another project's local-scope server in ~/.claude.json does not count"
+ready_chrome
+link_host_tool node
+write_claude_json "$HOME/.claude.json" '{}' "{\"/some/other/project\":{\"mcpServers\":$cdm_server}}"
+out=$(run_preflight)
+assert_kv MCP_CONFIGURED no "$out"
+assert_status NOT_CONFIGURED "$out"
+
+test_case "config: a user-scope server without autoConnect does not count"
+ready_chrome
+link_host_tool node
+write_claude_json "$HOME/.claude.json" '{"chrome-devtools":{"command":"npx","args":["chrome-devtools-mcp@latest","--isolated"]}}' '{}'
+out=$(run_preflight)
+assert_kv MCP_CONFIGURED no "$out"
+
+test_case "config: CLAUDE_CONFIG_DIR relocates ~/.claude.json"
+ready_chrome
+link_host_tool node
+write_claude_json "$SANDBOX/claude-config/.claude.json" "$cdm_server" '{}'
+out=$(CLAUDE_CONFIG_DIR="$SANDBOX/claude-config" run_preflight)
+assert_kv MCP_CONFIGURED yes "$out"
+assert_kv MCP_CONFIG_FILE "$SANDBOX/claude-config/.claude.json" "$out"
+
+test_case "config: ~/.claude.json is not consulted without node"
+ready_chrome
+write_claude_json "$HOME/.claude.json" "$cdm_server" '{}'
+out=$(run_preflight)
+assert_kv MCP_CONFIGURED no "$out"
+
+test_case "config: an unparseable ~/.claude.json is ignored"
+ready_chrome
+link_host_tool node
+printf '%s\n' '{"mcpServers": chrome-devtools autoConnect' > "$HOME/.claude.json"
+out=$(run_preflight)
+assert_kv MCP_CONFIGURED no "$out"
+assert_status NOT_CONFIGURED "$out"
+
 # configured_chrome — runner + modern chrome + a project .mcp.json
 configured_chrome() {
   ready_chrome
