@@ -5,6 +5,13 @@
 #                     [--out-dir <dir>] [--no-redact]
 set -u
 
+# The server version every config is written with. Pinned rather than @latest:
+# npx would otherwise fetch and run whatever was last published, at every
+# launch, inside a process attached to the user's real browser profile. Keep it
+# equal to the pin in .claude-plugin/plugin.json and setup-mcp.ps1; the suite
+# checks that they agree.
+CDM_PACKAGE=chrome-devtools-mcp@1.12.0
+
 AGENT=auto
 RUNNER_OVERRIDE=""
 CHANNEL=""
@@ -106,7 +113,7 @@ runner_command() {
 
 # Prints the server args, space separated, package first.
 mcp_args() {
-  printf 'chrome-devtools-mcp@latest --autoConnect'
+  printf '%s --autoConnect' "$CDM_PACKAGE"
   [ "$REDACT" = yes ] && printf ' --redactNetworkHeaders'
   # Performance traces otherwise send the traced URLs to the CrUX API; with a
   # real profile those URLs can be private.
@@ -122,7 +129,7 @@ json_escape() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
-# Prints a JSON array of the full args list, e.g. ["-y","chrome-devtools-mcp@latest",...]
+# Prints a JSON array of the full args list, e.g. ["-y","chrome-devtools-mcp@1.12.0",...]
 args_json() {
   prefix="$1"
   first=1

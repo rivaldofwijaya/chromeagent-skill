@@ -19,7 +19,7 @@ f="$SANDBOX/project/.mcp.json"
 if [ -f "$f" ]; then _ok ".mcp.json created"; else _fail ".mcp.json not created"; fi
 body=$(cat "$f")
 assert_contains '"chrome-devtools"' "$body"
-assert_contains 'chrome-devtools-mcp@latest' "$body"
+assert_contains 'chrome-devtools-mcp@1.12.0' "$body"
 assert_contains '\-\-autoConnect' "$body"
 assert_contains '\-\-redactNetworkHeaders' "$body"
 if printf '%s\n' "$body" | grep -q -- '"--autoConnect".*"--redactNetworkHeaders".*"--no-performance-crux".*"--no-file-navigations"'; then
@@ -651,3 +651,27 @@ stub_cmd uname 'echo Darwin'
 stub_cmd npx 'exit 0'
 out=$(run_setup_timeout 5 --runner "")
 assert_contains 'rc=0' "$out"
+
+test_case "setup: the plugin manifest and both setup scripts pin one server version"
+manifest="$REPO_ROOT/.claude-plugin/plugin.json"
+sh_pin=$(sed -n 's/^CDM_PACKAGE=//p' "$REPO_ROOT/skills/chromeagent/scripts/setup-mcp.sh")
+ps_pin=$(sed -n "s/^\$CdmPackage = '\(.*\)'$/\1/p" "$REPO_ROOT/skills/chromeagent/scripts/setup-mcp.ps1")
+plugin_pin=$(grep -o 'chrome-devtools-mcp@[^"]*' "$manifest" | sed -n '1p')
+case "$sh_pin" in
+  chrome-devtools-mcp@[0-9]*.[0-9]*.[0-9]*) _ok "setup-mcp.sh pins an exact version ($sh_pin)" ;;
+  *) _fail "setup-mcp.sh pin is not an exact version: '$sh_pin'" ;;
+esac
+if [ "$ps_pin" = "$sh_pin" ]; then _ok "setup-mcp.ps1 pin matches"; else _fail "setup-mcp.ps1 pins '$ps_pin', setup-mcp.sh '$sh_pin'"; fi
+if [ "$plugin_pin" = "$sh_pin" ]; then _ok "plugin.json pin matches"; else _fail "plugin.json pins '$plugin_pin', setup-mcp.sh '$sh_pin'"; fi
+
+test_case "setup: the plugin manifest carries the same args setup writes"
+stub_cmd uname 'echo Darwin'
+stub_cmd npx 'exit 0'
+run_setup --agent claude >/dev/null
+setup_args=$(sed -n 's/^ *"args": //p' "$SANDBOX/project/.mcp.json" | tr -d ' ')
+plugin_args=$(sed -n 's/^ *"args": //p' "$REPO_ROOT/.claude-plugin/plugin.json" | tr -d ' ')
+if [ -n "$setup_args" ] && [ "$setup_args" = "$plugin_args" ]; then
+  _ok "plugin.json args match setup's defaults"
+else
+  _fail "plugin.json args '$plugin_args' differ from setup's '$setup_args'"
+fi

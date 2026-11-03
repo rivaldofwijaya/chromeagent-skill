@@ -3,6 +3,9 @@
 # argv (especially a literal --) before the setup-mcp usage parser can run.
 $ErrorActionPreference = 'Stop'
 $script:ExitCode = 0
+# Pinned rather than @latest, for the reason given in setup-mcp.sh. Keep it equal
+# to CDM_PACKAGE there and the pin in .claude-plugin/plugin.json.
+$CdmPackage = 'chrome-devtools-mcp@1.12.0'
 
 function Write-Info([string]$Message) {
   [Console]::Out.WriteLine($Message)
@@ -235,7 +238,7 @@ function Get-RunnerParts {
 }
 
 function Get-ServerArgs {
-  $argsList = @('chrome-devtools-mcp@latest', '--autoConnect')
+  $argsList = @($CdmPackage, '--autoConnect')
   if (-not $NoRedact) { $argsList += '--redactNetworkHeaders' }
   # Performance traces otherwise send the traced URLs to the CrUX API; with a
   # real profile those URLs can be private.

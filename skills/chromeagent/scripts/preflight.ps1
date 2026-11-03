@@ -110,6 +110,17 @@ function Get-DebugReachable([string]$port) {
 }
 
 function Get-ConfigFile {
+  # Mirrors scan_config in preflight.sh: under Claude Code, a plugin install's
+  # own manifest provides the server and no config file is written.
+  if ($env:CLAUDECODE -eq '1') {
+    $manifest = Join-Path $PSScriptRoot '../../../.claude-plugin/plugin.json'
+    if (Test-Path -LiteralPath $manifest) {
+      $t = Get-Content -LiteralPath $manifest -Raw
+      if ($t -cmatch 'chrome-devtools' -and $t -cmatch 'autoConnect') {
+        return (Resolve-Path -LiteralPath $manifest).ProviderPath
+      }
+    }
+  }
   $paths = @(
     './.mcp.json', './.vscode/mcp.json', './.cursor/mcp.json', './opencode.json',
     './.codex/config.toml',

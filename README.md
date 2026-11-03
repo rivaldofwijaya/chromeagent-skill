@@ -27,6 +27,15 @@ claude plugin marketplace add rivaldofwijaya/chromeagent-skill
 claude plugin install chromeagent@chromeagent-skill
 ```
 
+The plugin provides the `chrome-devtools` server itself, so Claude Code needs no setup step and nothing
+is written into your project. Restart Claude Code (or run `/reload-plugins`) to start it, then do the
+one-time Chrome opt-in above. Its tools are named `mcp__plugin_chromeagent_chrome-devtools__*`. If an
+earlier setup left a `chrome-devtools` entry in a project's `.mcp.json`, delete that entry: its
+arguments differ from the plugin's, so Claude Code would start both servers.
+
+The setup scripts below are for every other agent, and for Claude Code when you copy the skill instead
+of installing the plugin.
+
 Or copy **`skills/chromeagent/`** into your agent's skills location, renaming it to `chromeagent-skill`.
 That folder is the installable skill, and everything else in this repository is development scaffolding:
 
@@ -89,7 +98,7 @@ current project, from `~/.claude.json`; that check needs Node.
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations"]
+      "args": ["-y", "chrome-devtools-mcp@1.12.0", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations"]
     }
   }
 }
@@ -107,7 +116,7 @@ arguments.
     "chrome-devtools": {
       "type": "local",
       "enabled": true,
-      "command": ["npx", "-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations"]
+      "command": ["npx", "-y", "chrome-devtools-mcp@1.12.0", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations"]
     }
   }
 }
@@ -120,7 +129,7 @@ this touches your **global** Codex config. Use the explicit `setup-mcp.sh --agen
 `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent codex`) when you want to update it:
 
 ```bash
-codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@latest --autoConnect --redactNetworkHeaders --no-performance-crux --no-file-navigations
+codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@1.12.0 --autoConnect --redactNetworkHeaders --no-performance-crux --no-file-navigations
 ```
 
 That produces:
@@ -128,7 +137,7 @@ That produces:
 ```toml
 [mcp_servers.chrome-devtools]
 command = "npx"
-args = ["-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations"]
+args = ["-y", "chrome-devtools-mcp@1.12.0", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations"]
 ```
 
 ### VS Code config (`.vscode/mcp.json`)
@@ -142,7 +151,7 @@ stdio is the default.
   "servers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations"]
+      "args": ["-y", "chrome-devtools-mcp@1.12.0", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations"]
     }
   }
 }
@@ -173,6 +182,8 @@ See `references/troubleshooting.md` for anything else.
 ## Security note
 
 Attaching to your real profile exposes every logged-in session to the agent and to page content.
+Every config, the plugin's included, pins `chrome-devtools-mcp@1.12.0` rather than `@latest`, so
+`npx` runs a release that was reviewed here instead of whatever was published last.
 `--redactNetworkHeaders` is on by default, and so is `--no-performance-crux`, which stops performance
 traces from sending the traced URLs to Google's CrUX API. `--no-file-navigations` is also on by default:
 the agent cannot open `file:` URLs, so a page cannot talk it into reading local files through the browser.

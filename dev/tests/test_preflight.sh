@@ -291,6 +291,25 @@ out=$(run_preflight)
 assert_kv MCP_CONFIGURED no "$out"
 assert_status NOT_CONFIGURED "$out"
 
+test_case "config: under Claude Code the plugin manifest provides the server"
+ready_chrome
+out=$(CLAUDECODE=1 run_preflight)
+assert_kv MCP_CONFIGURED yes "$out"
+assert_kv MCP_CONFIG_FILE "$REPO_ROOT/.claude-plugin/plugin.json" "$out"
+
+test_case "config: the plugin manifest does not count outside Claude Code"
+ready_chrome
+out=$(run_preflight)
+assert_kv MCP_CONFIGURED no "$out"
+assert_status NOT_CONFIGURED "$out"
+
+test_case "config: a copied skill has no plugin manifest to count"
+ready_chrome
+mkdir -p "$SANDBOX/skill"
+cp -R "$REPO_ROOT/skills/chromeagent/scripts" "$SANDBOX/skill/"
+out=$(cd "$SANDBOX/project" && CLAUDECODE=1 sh "$SANDBOX/skill/scripts/preflight.sh" 2>/dev/null)
+assert_kv MCP_CONFIGURED no "$out"
+
 # configured_chrome — runner + modern chrome + a project .mcp.json
 configured_chrome() {
   ready_chrome
