@@ -161,49 +161,49 @@ claude_snippet() {
 EOF
 }
 
+# merge_json_with_node FILE KEY ENTRY_JSON [SCHEMA_URL]
+# Sets FILE's KEY["chrome-devtools"] to ENTRY_JSON, keeping everything else, and
+# sets "$schema" when SCHEMA_URL is given. Writes through a temp file and a
+# rename, so a failure leaves the original untouched.
 merge_json_with_node() {
-  # merge_json_with_node FILE KEY_PATH COMMAND ARGS_JSON
-  file="$1"; keypath="$2"; cmd="$3"; args="$4"
   node -e '
     const fs=require("fs");
     const path=require("path");
-    const [file,keypath,cmd,args]=process.argv.slice(1);
+    const [file,key,entry,schema]=process.argv.slice(1);
     let doc={};
     try{doc=JSON.parse(fs.readFileSync(file,"utf8"))}catch(e){
       console.error("setup-mcp: "+file+" is not valid JSON; not modifying it");process.exit(3)}
     if(doc===null||typeof doc!=="object"||Array.isArray(doc)){
       console.error("setup-mcp: "+file+" must contain a JSON object at the root; not modifying it");process.exit(3)}
-    if(doc[keypath]===null||typeof doc[keypath]!=="object"||Array.isArray(doc[keypath])) doc[keypath]={};
-    doc[keypath]["chrome-devtools"]={command:cmd,args:JSON.parse(args)};
+    if(schema)doc.$schema=schema;
+    if(doc[key]===null||typeof doc[key]!=="object"||Array.isArray(doc[key])) doc[key]={};
+    doc[key]["chrome-devtools"]=JSON.parse(entry);
     const rendered=JSON.stringify(doc,null,2)+"\n";
-    const dir=path.dirname(file);
-    const base=path.basename(file);
-    let tempFile;
-    let tempCreated=false;
+    const tempFile=path.join(path.dirname(file),
+      "."+path.basename(file)+".tmp-"+process.pid+"-"+Date.now()+"-"+Math.random().toString(16).slice(2));
     let fd=-1;
+    let created=false;
     try{
-      tempFile=path.join(dir,"."+base+".tmp-"+process.pid+"-"+Date.now()+"-"+Math.random().toString(16).slice(2));
       fd=fs.openSync(tempFile,"wx");
-      tempCreated=true;
+      created=true;
       fs.writeFileSync(fd,rendered,"utf8");
       fs.closeSync(fd);
       fd=-1;
       fs.renameSync(tempFile,file);
-      tempFile=undefined;
     }catch(e){
-      if(fd !== -1){try{fs.closeSync(fd)}catch(_){}}
-      if(tempCreated){try{fs.unlinkSync(tempFile)}catch(_){}}
+      if(fd!==-1){try{fs.closeSync(fd)}catch(_){}}
+      if(created){try{fs.unlinkSync(tempFile)}catch(_){}}
       throw e;
     }
-  ' "$file" "$keypath" "$cmd" "$args"
+  ' "$@"
 }
 
-write_claude() {
-  rc=$(runner_command)
-  cmd=${rc%%|*}
-  prefix=${rc#*|}
-  args=$(args_json "$prefix")
-  target="$OUT_DIR/.mcp.json"
+# write_json_config TARGET KEY ENTRY_JSON SNIPPET [SCHEMA_URL]
+# Writes SNIPPET to a new TARGET, or merges ENTRY_JSON into an existing one.
+# Without node an existing file is left alone and SNIPPET is printed for a
+# manual merge.
+write_json_config() {
+  target="$1"; key="$2"; entry="$3"; snippet="$4"; schema="${5:-}"
 
   if [ -L "$target" ]; then
     printf 'setup-mcp: refusing to write through symlink %s\n' "$target" >&2
@@ -211,9 +211,7 @@ write_claude() {
   fi
 
   if [ ! -f "$target" ]; then
-    claude_snippet "$cmd" "$args" > "$target"
-    rc=$?
-    if [ "$rc" -eq 0 ]; then
+    if printf '%s\n' "$snippet" > "$target"; then
       printf 'setup-mcp: wrote %s\n' "$target"
       return 0
     fi
@@ -222,7 +220,7 @@ write_claude() {
   fi
 
   if command -v node >/dev/null 2>&1; then
-    if merge_json_with_node "$target" mcpServers "$cmd" "$args"; then
+    if merge_json_with_node "$target" "$key" "$entry" $schema; then
       printf 'setup-mcp: merged chrome-devtools into %s\n' "$target"
       return 0
     fi
@@ -231,8 +229,17 @@ write_claude() {
 
   printf 'setup-mcp: %s already exists and Node is unavailable, so it was left untouched.\n' "$target"
   printf 'setup-mcp: please merge this entry by hand:\n'
-  claude_snippet "$cmd" "$args"
+  printf '%s\n' "$snippet"
   return 3
+}
+
+write_claude() {
+  rc=$(runner_command)
+  cmd=${rc%%|*}
+  prefix=${rc#*|}
+  args=$(args_json "$prefix")
+  entry=$(printf '{"command": "%s", "args": %s}' "$(json_escape "$cmd")" "$args")
+  write_json_config "$OUT_DIR/.mcp.json" mcpServers "$entry" "$(claude_snippet "$cmd" "$args")"
 }
 
 # JSON array of the whole command line, for opencode's array-style "command".
@@ -267,75 +274,11 @@ opencode_snippet() {
 EOF
 }
 
-merge_opencode_with_node() {
-  file="$1"; command="$2"
-  node -e '
-    const fs=require("fs");
-    const path=require("path");
-    const [file,command]=process.argv.slice(1);
-    let doc={};
-    try{doc=JSON.parse(fs.readFileSync(file,"utf8"))}catch(e){
-      console.error("setup-mcp: "+file+" is not valid JSON; not modifying it");process.exit(3)}
-    if(doc===null||typeof doc!=="object"||Array.isArray(doc)){
-      console.error("setup-mcp: "+file+" must contain a JSON object at the root; not modifying it");process.exit(3)}
-    doc.$schema="https://opencode.ai/config.json";
-    doc.mcp=doc.mcp&&typeof doc.mcp==="object"&&!Array.isArray(doc.mcp)?doc.mcp:{};
-    doc.mcp["chrome-devtools"]={type:"local",enabled:true,command:JSON.parse(command)};
-    const rendered=JSON.stringify(doc,null,2)+"\n";
-    const dir=path.dirname(file);
-    const base=path.basename(file);
-    let tempFile;
-    let tempCreated=false;
-    let fd=-1;
-    try{
-      tempFile=path.join(dir,"."+base+".tmp-"+process.pid+"-"+Date.now()+"-"+Math.random().toString(16).slice(2));
-      fd=fs.openSync(tempFile,"wx");
-      tempCreated=true;
-      fs.writeFileSync(fd,rendered,"utf8");
-      fs.closeSync(fd);
-      fd=-1;
-      fs.renameSync(tempFile,file);
-      tempFile=undefined;
-    }catch(e){
-      if(fd !== -1){try{fs.closeSync(fd)}catch(_) {}}
-      if(tempCreated){try{fs.unlinkSync(tempFile)}catch(_) {}}
-      throw e;
-    }
-  ' "$file" "$command"
-}
-
 write_opencode() {
   cj=$(command_json)
-  target="$OUT_DIR/opencode.json"
-
-  if [ -L "$target" ]; then
-    printf 'setup-mcp: refusing to write through symlink %s\n' "$target" >&2
-    return 3
-  fi
-
-  if [ ! -f "$target" ]; then
-    opencode_snippet "$cj" > "$target"
-    rc=$?
-    if [ "$rc" -eq 0 ]; then
-      printf 'setup-mcp: wrote %s\n' "$target"
-      return 0
-    fi
-    printf 'setup-mcp: failed to write %s\n' "$target" >&2
-    return 3
-  fi
-
-  if command -v node >/dev/null 2>&1; then
-    if merge_opencode_with_node "$target" "$cj"; then
-      printf 'setup-mcp: merged chrome-devtools into %s\n' "$target"
-      return 0
-    fi
-    return 3
-  fi
-
-  printf 'setup-mcp: %s already exists and Node is unavailable, so it was left untouched.\n' "$target"
-  printf 'setup-mcp: please merge this entry by hand:\n'
-  opencode_snippet "$cj"
-  return 3
+  entry=$(printf '{"type": "local", "enabled": true, "command": %s}' "$cj")
+  write_json_config "$OUT_DIR/opencode.json" mcp "$entry" "$(opencode_snippet "$cj")" \
+    https://opencode.ai/config.json
 }
 
 write_codex() {
