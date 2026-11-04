@@ -1,0 +1,5 @@
+# Git for Windows defaults to core.autocrlf=true, which would check shell
+# scripts out with CRLF endings. Git Bash tolerates that, but sh under WSL or
+# Linux reading a Windows checkout (a plugin install is a clone) does not.
+* text=auto
+*.sh text eol=lf
