@@ -6,6 +6,12 @@ $script:ExitCode = 0
 # Pinned rather than @latest, for the reason given in setup-mcp.sh. Keep it equal
 # to CDM_PACKAGE there and the pin in .claude-plugin/plugin.json.
 $CdmPackage = 'chrome-devtools-mcp@1.12.0'
+# The home directory Codex itself uses, as in preflight.ps1: USERPROFILE on
+# Windows and HOME elsewhere; PowerShell's own $HOME ignores both on Windows.
+$OnWindows = ($PSVersionTable.PSVersion.Major -lt 6) -or $IsWindows
+$UserHome = if ($OnWindows -and $env:USERPROFILE) { $env:USERPROFILE }
+            elseif (-not $OnWindows -and $env:HOME) { $env:HOME }
+            else { $HOME }
 
 function Write-Info([string]$Message) {
   [Console]::Out.WriteLine($Message)
@@ -401,7 +407,7 @@ function Get-DetectedAgents {
 }
 
 function Test-CodexPresent {
-  $codexConfigPath = Join-Path (Join-Path $HOME '.codex') 'config.toml'
+  $codexConfigPath = Join-Path (Join-Path $UserHome '.codex') 'config.toml'
   $codexCommand = Get-Command codex -ErrorAction SilentlyContinue
   return ((Test-Path -LiteralPath $codexConfigPath -PathType Leaf) -or ($null -ne $codexCommand))
 }

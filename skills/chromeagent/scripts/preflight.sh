@@ -152,14 +152,32 @@ find_chrome() {
   done
 }
 
+# running_as_plugin — exit 0 when the plugin root these scripts belong to sits
+# inside Claude Code's plugins directory, where a plugin install puts it
+# (<config>/plugins/cache/<marketplace>/<plugin>/<version>/).
+running_as_plugin() {
+  plugin_root=$(cd "$SCRIPT_DIR/../../.." 2>/dev/null && pwd -P) || return 1
+  plugins_dir=$(cd "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins" 2>/dev/null && pwd -P) || return 1
+  [ -n "$plugin_root" ] && [ -n "$plugins_dir" ] || return 1
+  if [ "${PLATFORM:-}" = windows ]; then
+    plugin_root=$(printf '%s\n' "$plugin_root" | tr '[:upper:]' '[:lower:]')
+    plugins_dir=$(printf '%s\n' "$plugins_dir" | tr '[:upper:]' '[:lower:]')
+  fi
+  case "$plugin_root/" in
+    "$plugins_dir"/*) return 0 ;;
+  esac
+  return 1
+}
+
 # Prints the path of the first config that configures chrome-devtools with
 # --autoConnect. Prints nothing when none does.
 scan_config() {
   # Installed as a Claude Code plugin, the plugin's own manifest provides the
   # server and no config file is written. It counts only under Claude Code
-  # (CLAUDECODE=1): another agent running these scripts from a clone does not
-  # read that manifest.
-  if [ "${CLAUDECODE:-}" = 1 ]; then
+  # (CLAUDECODE=1), and only when these scripts run from Claude Code's plugins
+  # directory: a clone has the same manifest beside its scripts, but nothing
+  # loads it, so counting it there reports a server that never starts.
+  if [ "${CLAUDECODE:-}" = 1 ] && running_as_plugin; then
     f="$SCRIPT_DIR/../../../.claude-plugin/plugin.json"
     if [ -f "$f" ] && grep -q 'chrome-devtools' "$f" 2>/dev/null &&
        grep -q 'autoConnect' "$f" 2>/dev/null; then

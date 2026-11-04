@@ -3,6 +3,13 @@
 $ErrorActionPreference = 'SilentlyContinue'
 $CHROME_MIN_MAJOR = 144
 $Root = $env:CHROMEAGENT_ROOT
+# The home directory the agents themselves use. Claude Code, Codex, and
+# OpenCode resolve it from USERPROFILE on Windows and HOME elsewhere;
+# PowerShell's own $HOME ignores both variables on Windows.
+$OnWindows = ($PSVersionTable.PSVersion.Major -lt 6) -or $IsWindows
+$UserHome = if ($OnWindows -and $env:USERPROFILE) { $env:USERPROFILE }
+            elseif (-not $OnWindows -and $env:HOME) { $env:HOME }
+            else { $HOME }
 
 function Test-Cmd([string]$name) { [bool](Get-Command $name -ErrorAction SilentlyContinue) }
 
@@ -32,7 +39,9 @@ function Get-ChromeCandidates {
       }
     }
   }
-  # Last resort: the registry App Paths entry.
+  # Last resort: the registry App Paths entry. Under a test root it names the
+  # host's real Chrome, which the root exists to hide, so it is skipped there.
+  if ($Root) { return }
   $reg = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe'
   $p = (Get-ItemProperty $reg -ErrorAction SilentlyContinue).'(default)'
   if ($p) {
@@ -109,10 +118,26 @@ function Get-DebugReachable([string]$port) {
   }
 }
 
+# Mirrors running_as_plugin in preflight.sh: true when the plugin root these
+# scripts belong to sits inside Claude Code's plugins directory, where a
+# plugin install puts it (<config>/plugins/cache/<marketplace>/<plugin>/<version>/).
+function Test-RunningAsPlugin {
+  $root = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../../..') -ErrorAction SilentlyContinue
+  $configDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $UserHome '.claude' }
+  $plugins = Resolve-Path -LiteralPath (Join-Path $configDir 'plugins') -ErrorAction SilentlyContinue
+  if (-not $root -or -not $plugins) { return $false }
+  $r = $root.ProviderPath.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+  $p = $plugins.ProviderPath.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+  # Windows paths are case-insensitive.
+  $cmp = if ($OnWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
+  return $r.StartsWith($p, $cmp)
+}
+
 function Get-ConfigFile {
   # Mirrors scan_config in preflight.sh: under Claude Code, a plugin install's
-  # own manifest provides the server and no config file is written.
-  if ($env:CLAUDECODE -eq '1') {
+  # own manifest provides the server and no config file is written. A clone
+  # has the same manifest beside its scripts, but nothing loads it there.
+  if (($env:CLAUDECODE -eq '1') -and (Test-RunningAsPlugin)) {
     $manifest = Join-Path $PSScriptRoot '../../../.claude-plugin/plugin.json'
     if (Test-Path -LiteralPath $manifest) {
       $t = Get-Content -LiteralPath $manifest -Raw
@@ -124,8 +149,8 @@ function Get-ConfigFile {
   $paths = @(
     './.mcp.json', './.vscode/mcp.json', './.cursor/mcp.json', './opencode.json',
     './.codex/config.toml',
-    (Join-Path $HOME '.codex/config.toml'),
-    (Join-Path $HOME '.config/opencode/opencode.json')
+    (Join-Path $UserHome '.codex/config.toml'),
+    (Join-Path $UserHome '.config/opencode/opencode.json')
   )
   foreach ($p in $paths) {
     if (Test-Path -LiteralPath $p) {
@@ -133,7 +158,7 @@ function Get-ConfigFile {
       if ($t -cmatch 'chrome-devtools' -and $t -cmatch 'autoConnect') { return $p }
     }
   }
-  $claudeDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { $HOME }
+  $claudeDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { $UserHome }
   $claudeJson = Join-Path $claudeDir '.claude.json'
   if ((Test-Path -LiteralPath $claudeJson) -and (Test-ClaudeConfig $claudeJson)) { return $claudeJson }
   return $null
