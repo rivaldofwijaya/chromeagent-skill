@@ -150,11 +150,9 @@ test_case "docs: no remediation hands a Codex user an unconditional auto"
 # alternative on the same line; `auto` never configures Codex.
 # setup.md is exempt: it lists the auto and codex commands on separate lines
 # under their host names.
-for doc in "$TROUBLE_FILE"; do
-  unconditional=$(grep -F -e 'setup-mcp.sh --agent auto' -e 'setup-mcp.ps1 -Agent auto' "$doc" | grep -F -v -- 'codex')
-  if [ -n "$unconditional" ]; then _fail "$(basename "$doc") prescribes an unconditional target: $unconditional"
-  else _ok "every $(basename "$doc") auto invocation names the codex alternative"; fi
-done
+unconditional=$(grep -F -e 'setup-mcp.sh --agent auto' -e 'setup-mcp.ps1 -Agent auto' "$TROUBLE_FILE" | grep -F -v -- 'codex')
+if [ -n "$unconditional" ]; then _fail "troubleshooting.md prescribes an unconditional target: $unconditional"
+else _ok "every troubleshooting.md auto invocation names the codex alternative"; fi
 
 test_case "docs: reference links resolve"
 for ref in $(grep -o 'references/[a-z-]*\.md' "$SKILL_FILE" "$TROUBLE_FILE" | sed 's/^[^:]*://' | sort -u); do
