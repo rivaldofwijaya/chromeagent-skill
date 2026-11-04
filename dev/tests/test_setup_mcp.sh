@@ -73,7 +73,10 @@ for agent in claude opencode; do
   if [ "$agent" = claude ]; then target_name=.mcp.json; else target_name=opencode.json; fi
   target="$SANDBOX/project/$target_name"
   pointed_to="$HOME/.codex/config.toml"
-  ln -s "$pointed_to" "$target"
+  if ! make_symlink "$pointed_to" "$target"; then
+    _skip "this platform will not create a symlink (Windows: needs admin or Developer Mode)"
+    break
+  fi
   out=$(run_setup --agent "$agent")
   rc=$?
   assert_setup_rc 3 "$rc"
@@ -214,10 +217,10 @@ stub_cmd npx 'exit 0'
 if link_host_tool node; then
   printf '%s\n' '{"mcpServers":{"other-server":{"command":"other","args":["original"]}}}' > "$SANDBOX/project/.mcp.json"
   before=$(cat "$SANDBOX/project/.mcp.json")
-  chmod 500 "$SANDBOX/project"
+  deny_writes "$SANDBOX/project"
   out=$(run_setup --agent claude)
   rc=$?
-  chmod 700 "$SANDBOX/project"
+  allow_writes "$SANDBOX/project"
   after=$(cat "$SANDBOX/project/.mcp.json")
   assert_setup_rc 3 "$rc"
   if [ "$before" = "$after" ]; then _ok "file survived failed merge"; else _fail "file was modified by failed merge"; fi
@@ -228,10 +231,10 @@ fi
 test_case "setup claude: failed create is reported as failure"
 stub_cmd uname 'echo Darwin'
 stub_cmd npx 'exit 0'
-chmod 500 "$SANDBOX/project"
+deny_writes "$SANDBOX/project"
 out=$(run_setup --agent claude)
 rc=$?
-chmod 700 "$SANDBOX/project"
+allow_writes "$SANDBOX/project"
 assert_setup_rc 3 "$rc"
 assert_contains "setup-mcp: failed to write $SANDBOX/project/.mcp.json" "$out"
 assert_not_contains "wrote $SANDBOX/project/.mcp.json" "$out"
@@ -308,10 +311,10 @@ assert_contains 'autoConnect' "$body"
 test_case "setup opencode: failed create exits 3"
 stub_cmd uname 'echo Darwin'
 stub_cmd npx 'exit 0'
-chmod 500 "$SANDBOX/project"
+deny_writes "$SANDBOX/project"
 out=$(run_setup --agent opencode)
 rc=$?
-chmod 700 "$SANDBOX/project"
+allow_writes "$SANDBOX/project"
 assert_setup_rc 3 "$rc"
 assert_contains "setup-mcp: failed to write $SANDBOX/project/opencode.json" "$out"
 assert_not_contains "wrote $SANDBOX/project/opencode.json" "$out"

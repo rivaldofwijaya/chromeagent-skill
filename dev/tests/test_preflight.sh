@@ -248,7 +248,7 @@ assert_kv MCP_CONFIG_FILE "$HOME/.claude.json" "$out"
 test_case "config: a local-scope server for this project in ~/.claude.json is detected"
 ready_chrome
 link_host_tool node
-project_dir=$(cd "$SANDBOX/project" && pwd)
+project_dir=$(cd "$SANDBOX/project" && { pwd -W 2>/dev/null || pwd; })  # pwd -W: the D:/... form Claude Code writes on Windows
 write_claude_json "$HOME/.claude.json" '{}' "{\"$project_dir\":{\"mcpServers\":$cdm_server}}"
 out=$(run_preflight)
 assert_kv MCP_CONFIGURED yes "$out"
@@ -291,11 +291,37 @@ out=$(run_preflight)
 assert_kv MCP_CONFIGURED no "$out"
 assert_status NOT_CONFIGURED "$out"
 
-test_case "config: under Claude Code the plugin manifest provides the server"
+# install_plugin CONFIG_DIR — lay the plugin out the way a Claude Code plugin
+# install does, under CONFIG_DIR/plugins/cache/<marketplace>/<plugin>/<version>/,
+# and print that root.
+install_plugin() {
+  ip_root="$1/plugins/cache/chromeagent-skill/chromeagent/1.0.0"
+  mkdir -p "$ip_root/.claude-plugin" "$ip_root/skills/chromeagent"
+  cp "$REPO_ROOT/.claude-plugin/plugin.json" "$ip_root/.claude-plugin/"
+  cp -R "$REPO_ROOT/skills/chromeagent/scripts" "$ip_root/skills/chromeagent/"
+  printf '%s\n' "$ip_root"
+}
+
+test_case "config: under Claude Code an installed plugin's manifest provides the server"
 ready_chrome
-out=$(CLAUDECODE=1 run_preflight)
+plugin=$(install_plugin "$HOME/.claude")
+out=$(cd "$SANDBOX/project" && CLAUDECODE=1 sh "$plugin/skills/chromeagent/scripts/preflight.sh" 2>/dev/null)
 assert_kv MCP_CONFIGURED yes "$out"
-assert_kv MCP_CONFIG_FILE "$REPO_ROOT/.claude-plugin/plugin.json" "$out"
+assert_kv MCP_CONFIG_FILE "$(cd "$plugin" && pwd)/.claude-plugin/plugin.json" "$out"
+
+test_case "config: an installed plugin is found under CLAUDE_CONFIG_DIR"
+ready_chrome
+mkdir -p "$SANDBOX/cfg"
+plugin=$(install_plugin "$SANDBOX/cfg")
+out=$(cd "$SANDBOX/project" && CLAUDECODE=1 CLAUDE_CONFIG_DIR="$SANDBOX/cfg" sh "$plugin/skills/chromeagent/scripts/preflight.sh" 2>/dev/null)
+assert_kv MCP_CONFIGURED yes "$out"
+
+test_case "config: a clone's plugin manifest does not count under Claude Code"
+ready_chrome
+mkdir -p "$HOME/.claude/plugins"
+out=$(CLAUDECODE=1 run_preflight)
+assert_kv MCP_CONFIGURED no "$out"
+assert_status NOT_CONFIGURED "$out"
 
 test_case "config: the plugin manifest does not count outside Claude Code"
 ready_chrome

@@ -84,7 +84,7 @@ test_case "ps1: a local-scope server for this project in ~/.claude.json is detec
 link_host_tool pwsh
 stub_cmd npx 'exit 0'
 export CHROMEAGENT_FAKE_CHROME="stable|C:/fake/chrome.exe|145.0.7300.20|C:/fake/UserData"
-project_dir=$(cd "$SANDBOX/project" && pwd)
+project_dir=$(cd "$SANDBOX/project" && { pwd -W 2>/dev/null || pwd; })  # pwd -W: the D:/... form Claude Code writes on Windows
 printf '{"mcpServers":{},"projects":{"%s":{"mcpServers":{"chrome-devtools":{"command":"npx","args":["--autoConnect"]}}}}}\n' "$project_dir" > "$HOME/.claude.json"
 out=$(run_ps1)
 unset CHROMEAGENT_FAKE_CHROME
@@ -96,6 +96,31 @@ stub_cmd npx 'exit 0'
 export CHROMEAGENT_FAKE_CHROME="stable|C:/fake/chrome.exe|145.0.7300.20|C:/fake/UserData"
 printf '%s\n' '{"mcpServers":{},"projects":{"/some/other/project":{"mcpServers":{"chrome-devtools":{"command":"npx","args":["--autoConnect"]}}}}}' > "$HOME/.claude.json"
 out=$(run_ps1)
+unset CHROMEAGENT_FAKE_CHROME
+assert_kv MCP_CONFIGURED no "$out"
+assert_status NOT_CONFIGURED "$out"
+
+# These two set CLAUDE_CONFIG_DIR rather than HOME: on Windows, PowerShell's
+# $HOME comes from USERPROFILE, so a sandbox HOME would not reach it.
+test_case "ps1: under Claude Code an installed plugin's manifest provides the server"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+export CHROMEAGENT_FAKE_CHROME="stable|C:/fake/chrome.exe|145.0.7300.20|C:/fake/UserData"
+ip_root="$SANDBOX/cfg/plugins/cache/chromeagent-skill/chromeagent/1.0.0"
+mkdir -p "$ip_root/.claude-plugin" "$ip_root/skills/chromeagent"
+cp "$REPO_ROOT/.claude-plugin/plugin.json" "$ip_root/.claude-plugin/"
+cp -R "$REPO_ROOT/skills/chromeagent/scripts" "$ip_root/skills/chromeagent/"
+out=$(cd "$SANDBOX/project" && CLAUDECODE=1 CLAUDE_CONFIG_DIR="$SANDBOX/cfg" pwsh -NoProfile -File "$ip_root/skills/chromeagent/scripts/preflight.ps1" 2>/dev/null)
+unset CHROMEAGENT_FAKE_CHROME
+assert_kv MCP_CONFIGURED yes "$out"
+assert_contains 'MCP_CONFIG_FILE=.*plugin\.json' "$out"
+
+test_case "ps1: a clone's plugin manifest does not count under Claude Code"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+export CHROMEAGENT_FAKE_CHROME="stable|C:/fake/chrome.exe|145.0.7300.20|C:/fake/UserData"
+mkdir -p "$SANDBOX/cfg/plugins"
+out=$(cd "$SANDBOX/project" && CLAUDECODE=1 CLAUDE_CONFIG_DIR="$SANDBOX/cfg" pwsh -NoProfile -File "$REPO_ROOT/skills/chromeagent/scripts/preflight.ps1" 2>/dev/null)
 unset CHROMEAGENT_FAKE_CHROME
 assert_kv MCP_CONFIGURED no "$out"
 assert_status NOT_CONFIGURED "$out"
@@ -176,7 +201,7 @@ out_dir="$SANDBOX/missing"
 out=$(run_setup_ps1 -Agent claude -OutDir "$out_dir")
 rc=$?
 if [ "$rc" -eq 2 ]; then _ok "exit 2"; else _fail "expected exit 2, got $rc"; fi
-assert_contains "setup-mcp: -OutDir $out_dir is not a directory" "$out"
+assert_contains_text "setup-mcp: -OutDir $(ps_arg "$out_dir") is not a directory" "$out"
 if [ ! -e "$out_dir" ]; then _ok "nonexistent directory was not created"; else _fail "nonexistent directory was created"; fi
 if [ ! -e "$SANDBOX/project/.mcp.json" ]; then _ok "cwd was not written"; else _fail "cwd was written"; fi
 
@@ -188,7 +213,7 @@ printf '%s\n' original > "$out_dir"
 out=$(run_setup_ps1 -Agent claude -OutDir "$out_dir")
 rc=$?
 if [ "$rc" -eq 2 ]; then _ok "exit 2"; else _fail "expected exit 2, got $rc"; fi
-assert_contains "setup-mcp: -OutDir $out_dir is not a directory" "$out"
+assert_contains_text "setup-mcp: -OutDir $(ps_arg "$out_dir") is not a directory" "$out"
 if [ -f "$out_dir" ] && [ "$(cat "$out_dir")" = original ]; then
   _ok "file target was left untouched"
 else
@@ -204,11 +229,14 @@ for agent in claude opencode; do
   if [ "$agent" = claude ]; then target_name=.mcp.json; else target_name=opencode.json; fi
   target="$SANDBOX/project/$target_name"
   pointed_to="$HOME/.codex/config.toml"
-  ln -s "$pointed_to" "$target"
+  if ! make_symlink "$pointed_to" "$target"; then
+    _skip "this platform will not create a symlink (Windows: needs admin or Developer Mode)"
+    break
+  fi
   out=$(run_setup_ps1 -Agent "$agent")
   rc=$?
   if [ "$rc" -eq 3 ]; then _ok "exit 3"; else _fail "expected exit 3, got $rc"; fi
-  assert_contains "setup-mcp: refusing to write through symlink $target" "$out"
+  assert_contains_text "setup-mcp: refusing to write through symlink $(ps_path "$target")" "$out"
   if [ -L "$target" ]; then _ok "$target remained a symlink"; else _fail "$target was replaced"; fi
   if [ ! -e "$pointed_to" ]; then _ok "pointed-at file was not created"; else _fail "pointed-at file was created"; fi
 done
@@ -223,7 +251,7 @@ for agent in claude opencode; do
   out=$(run_setup_ps1 -Agent "$agent")
   rc=$?
   if [ "$rc" -eq 3 ]; then _ok "exit 3"; else _fail "expected exit 3, got $rc"; fi
-  assert_contains "setup-mcp: failed to write $target" "$out"
+  assert_contains_text "setup-mcp: failed to write $(ps_path "$target")" "$out"
   if [ -d "$target" ] && [ -z "$(ls -A "$target")" ]; then
     _ok "$target remained an empty directory"
   else
@@ -245,7 +273,7 @@ stub_cmd npx 'exit 0'
 out=$(run_setup_ps1 -Agent claude)
 rc=$?
 if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
-assert_contains "setup-mcp: wrote $SANDBOX/project/.mcp.json" "$out"
+assert_contains_text "setup-mcp: wrote $(ps_path "$SANDBOX/project/.mcp.json")" "$out"
 assert_not_contains 'wrote ./' "$out"
 
 test_case "ps1 setup: merge message names the absolute target"
@@ -255,7 +283,7 @@ printf '%s\n' '{"mcpServers":{"other-server":{"command":"other"}}}' > "$SANDBOX/
 out=$(run_setup_ps1 -Agent claude)
 rc=$?
 if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
-assert_contains "setup-mcp: merged chrome-devtools into $SANDBOX/project/.mcp.json" "$out"
+assert_contains_text "setup-mcp: merged chrome-devtools into $(ps_path "$SANDBOX/project/.mcp.json")" "$out"
 assert_not_contains 'merged chrome-devtools into ./' "$out"
 
 test_case "ps1 setup: auto probes and configures markers in the resolved output directory"
@@ -578,7 +606,7 @@ out=$(run_setup_ps1_with_move_failure claude)
 rc=$?
 after=$(cat "$SANDBOX/project/.mcp.json")
 if [ "$rc" -eq 3 ]; then _ok "rename failure exits 3"; else _fail "expected rename failure exit 3, got $rc"; fi
-assert_contains "setup-mcp: failed to write $SANDBOX/project/.mcp.json" "$out"
+assert_contains_text "setup-mcp: failed to write $(ps_path "$SANDBOX/project/.mcp.json")" "$out"
 if [ "$before" = "$after" ]; then _ok "original file survived rename failure"; else _fail "original file was modified"; fi
 temp_left=no
 for temp in "$SANDBOX/project"/..mcp.json.tmp-*; do
@@ -592,12 +620,12 @@ stub_cmd npx 'exit 0'
 out=$(run_setup_ps1_with_move_failure claude)
 rc=$?
 if [ "$rc" -eq 3 ]; then _ok "claude create failure exits 3"; else _fail "expected claude create failure exit 3, got $rc"; fi
-assert_contains "setup-mcp: failed to write $SANDBOX/project/.mcp.json" "$out"
+assert_contains_text "setup-mcp: failed to write $(ps_path "$SANDBOX/project/.mcp.json")" "$out"
 if [ ! -e "$SANDBOX/project/.mcp.json" ]; then _ok "claude target was not created"; else _fail "claude target was created"; fi
 out=$(run_setup_ps1_with_move_failure opencode)
 rc=$?
 if [ "$rc" -eq 3 ]; then _ok "opencode create failure exits 3"; else _fail "expected opencode create failure exit 3, got $rc"; fi
-assert_contains "setup-mcp: failed to write $SANDBOX/project/opencode.json" "$out"
+assert_contains_text "setup-mcp: failed to write $(ps_path "$SANDBOX/project/opencode.json")" "$out"
 if [ ! -e "$SANDBOX/project/opencode.json" ]; then _ok "opencode target was not created"; else _fail "opencode target was created"; fi
 
 test_case "ps1 setup: malformed JSON root shapes fail without clobbering"

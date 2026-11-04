@@ -20,11 +20,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        # windows-latest runs the suite under Git Bash, with pwsh on PATH, so
+        # it exercises preflight.ps1 and setup-mcp.ps1 on their real platform.
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run the suite
-        run: dev/tests/run-tests.sh
+        shell: bash
+        run: sh dev/tests/run-tests.sh
 
   shellcheck:
     name: shellcheck
