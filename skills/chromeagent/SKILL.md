@@ -36,6 +36,10 @@ Set-Location /path/to/your/project
 pwsh -File /path/to/chromeagent-skill/scripts/preflight.ps1  # native Windows
 ```
 
+Without `pwsh` (stock Windows ships only Windows PowerShell 5.1), run either `.ps1` script as
+`powershell -NoProfile -ExecutionPolicy Bypass -File <script> <args>`. Both scripts support 5.1, and
+its default `Restricted` policy otherwise refuses to run them; `Bypass` applies to that process only.
+
 The two are different directories, and that is the whole trap. Preflight scans for config relative
 to its working directory, and setup writes there, so a shell left in the skill's directory reports
 `NOT_CONFIGURED` and sends setup's write to the wrong place. When the shell cannot sit in the

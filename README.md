@@ -12,7 +12,9 @@ cookies, logins, and tabs you already have open, through the
   144+ feature.
 - A **one-time opt-in inside Chrome**: open `chrome://inspect/#remote-debugging` and click Allow.
   Nothing here automates that step.
-- Native Windows setup uses PowerShell 6+ (`pwsh`). Windows PowerShell 5.1 works for `preflight.ps1`.
+- On native Windows, PowerShell 7 (`pwsh`) or the built-in Windows PowerShell 5.1. Both scripts run
+  under either; with 5.1, use `powershell -NoProfile -ExecutionPolicy Bypass -File <script>`, since
+  its default `Restricted` execution policy refuses to run scripts.
 
 ## Install
 
@@ -213,11 +215,14 @@ repository.
 ## Tests
 
 ```bash
-sh dev/tests/run-tests.sh
+sh dev/tests/run-tests.sh                     # every test file
+sh dev/tests/run-tests.sh test_setup_mcp.sh   # just the files named
 ```
 
 Hermetic: every test runs in a sandbox with its own `HOME`, `PATH`, and fake Chrome installs.
-PowerShell tests are skipped when `pwsh` is absent.
+PowerShell tests are skipped when `pwsh` is absent. On Windows, run the suite from Git Bash; it is
+much slower there because process startup is expensive. The symlink tests are skipped unless Windows
+lets you create symlinks (an elevated shell, or Developer Mode on).
 
 ## License
 

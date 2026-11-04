@@ -38,7 +38,10 @@ No `chrome-devtools` entry with `--autoConnect` in any scanned config. Choose th
 On native Windows, use `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent <target>` instead. Pass any reported beta/dev/canary channel as described in `references/setup.md`.
 
 Under Claude Code (`CLAUDECODE=1`), a plugin install counts first: the plugin's own
-`.claude-plugin/plugin.json` provides the server, so no config file exists to find. Then scanned, in
+`.claude-plugin/plugin.json` provides the server, so no config file exists to find. It counts only
+when the scripts run from Claude Code's plugins directory (`~/.claude/plugins/`, or
+`$CLAUDE_CONFIG_DIR/plugins/`); the same manifest in a git clone is not loaded by anything, so it
+does not count. Then scanned, in
 order: `./.mcp.json`, `./.vscode/mcp.json`, `./.cursor/mcp.json`, `./opencode.json`,
 `./.codex/config.toml`, `~/.codex/config.toml`, `~/.config/opencode/opencode.json`, then Claude Code's
 `~/.claude.json` (or `$CLAUDE_CONFIG_DIR/.claude.json`): its user-scope servers, and its local-scope
@@ -91,9 +94,11 @@ Use the values preflight already printed — `DEBUG_PORT` and `USER_DATA_DIR` �
 defaults. A beta, dev, or canary profile has its own directory, and Chrome can pick a port other
 than 9222. The checks that do work:
 
-- `lsof -nP -iTCP:<DEBUG_PORT> -sTCP:LISTEN` — something is listening on the port.
+- `lsof -nP -iTCP:<DEBUG_PORT> -sTCP:LISTEN` — something is listening on the port. On Windows:
+  `Get-NetTCPConnection -LocalPort <DEBUG_PORT> -State Listen | ForEach-Object { Get-Process -Id $_.OwningProcess }`,
+  which also names the listening process.
 - `cat "<USER_DATA_DIR>/DevToolsActivePort"` — line 1 is the port, line 2 is the
-  `/devtools/browser/<uuid>` path.
+  `/devtools/browser/<uuid>` path. On Windows: `Get-Content "<USER_DATA_DIR>\DevToolsActivePort"`.
 
 Preflight reports this state as `DEBUG_REACHABLE=optin`.
 
@@ -131,7 +136,8 @@ If the tools still do not appear, the server may be exiting at startup, which pr
   corroboration. If an unrelated listener occupies that port and returns any non-200 response, preflight
   sees `DEBUG_REACHABLE=optin` plus the port file and reports `STATUS=READY`, even though Chrome is not
   serving DevTools there. `READY` validates local conditions only; the real connection remains the final
-  test. To tell, run `lsof -nP -iTCP:<DEBUG_PORT> -sTCP:LISTEN` and confirm the listener is a Google
+  test. To tell, run `lsof -nP -iTCP:<DEBUG_PORT> -sTCP:LISTEN` (on Windows, the
+  `Get-NetTCPConnection` command in the `NEEDS_OPT_IN` section) and confirm the listener is a Google
   Chrome process, then check that line 1 of `<USER_DATA_DIR>/DevToolsActivePort` is the port you
   expect — taking both values from preflight's own output rather than assuming port 9222 and the
   stable-channel profile. Delete the stale file and/or free the port, re-do the opt-in, and re-run
