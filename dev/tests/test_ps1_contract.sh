@@ -224,11 +224,11 @@ fi
 test_case "ps1 setup: refuses dangling symlink targets without creating pointed-at files"
 link_host_tool pwsh
 stub_cmd npx "exit 0"
-mkdir -p "$HOME/.codex"
+mkdir -p "$HOME/elsewhere"
 for agent in claude opencode; do
   if [ "$agent" = claude ]; then target_name=.mcp.json; else target_name=opencode.json; fi
   target="$SANDBOX/project/$target_name"
-  pointed_to="$HOME/.codex/config.toml"
+  pointed_to="$HOME/elsewhere/config.json"
   if ! make_symlink "$pointed_to" "$target"; then
     _skip "this platform will not create a symlink (Windows: needs admin or Developer Mode)"
     break
@@ -303,58 +303,6 @@ assert_contains "chrome-devtools" "$(cat "$out_dir/opencode.json")"
 if [ ! -e "$SANDBOX/project/.mcp.json" ]; then _ok "cwd was not written"; else _fail "cwd was written"; fi
 if [ ! -e "$SANDBOX/project/opencode.json" ]; then _ok "cwd remained empty"; else _fail "cwd received a marker target"; fi
 
-test_case "ps1 setup: auto does not invoke codex from PATH"
-link_host_tool pwsh
-stub_cmd npx 'exit 0'
-stub_cmd codex 'printf "%s\n" invoked > "$HOME/auto-codex.log"'
-out=$(run_setup_ps1 -Agent auto)
-rc=$?
-if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
-if [ ! -e "$HOME/auto-codex.log" ]; then
-  _ok "codex stub was not invoked"
-else
-  _fail "codex stub was invoked"
-fi
-
-test_case "ps1 setup: auto does not modify the global codex config"
-link_host_tool pwsh
-stub_cmd npx 'exit 0'
-mkdir -p "$HOME/.codex"
-printf '%s\n' 'existing = true' > "$HOME/.codex/config.toml"
-cp "$HOME/.codex/config.toml" "$SANDBOX/codex-config.before"
-out=$(run_setup_ps1 -Agent auto)
-rc=$?
-if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
-assert_contains "setup-mcp: codex detected but not configured; run -Agent codex to update your global Codex config." "$out"
-if link_host_tool cmp; then
-  if cmp -s "$SANDBOX/codex-config.before" "$HOME/.codex/config.toml"; then
-    _ok "global codex config is byte-identical"
-  else
-    _fail "global codex config was modified"
-  fi
-else
-  _fail "host cmp unavailable"
-fi
-
-test_case "ps1 setup: auto prints one codex notice for a PATH codex"
-link_host_tool pwsh
-stub_cmd npx 'exit 0'
-stub_cmd codex 'exit 0'
-out=$(run_setup_ps1 -Agent auto)
-rc=$?
-if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
-codex_notice='setup-mcp: codex detected but not configured; run -Agent codex to update your global Codex config.'
-notice_count=$(printf '%s\n' "$out" | grep -F -x -c -- "$codex_notice")
-if [ "$notice_count" -eq 1 ]; then _ok "codex notice printed once"; else _fail "codex notice count was $notice_count"; fi
-
-test_case "ps1 setup: auto does not print a codex notice when codex is absent"
-link_host_tool pwsh
-stub_cmd npx 'exit 0'
-out=$(run_setup_ps1 -Agent auto)
-rc=$?
-if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
-assert_not_contains 'setup-mcp: codex detected but not configured' "$out"
-
 test_case "ps1 setup: an opencode marker beats a PATH-only claude"
 link_host_tool pwsh
 stub_cmd npx "exit 0"
@@ -400,23 +348,6 @@ rc=$?
 if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
 if [ -f "$SANDBOX/project/.mcp.json" ]; then _ok ".claude marker selected claude"; else _fail ".claude marker did not select claude"; fi
 if [ ! -e "$SANDBOX/project/opencode.json" ]; then _ok "opencode was not selected"; else _fail "opencode was selected"; fi
-
-test_case "ps1 setup: -OutDir is ignored for codex"
-link_host_tool pwsh
-stub_cmd npx 'exit 0'
-stub_cmd codex 'exit 0'
-out_dir="$SANDBOX/target"
-mkdir "$out_dir"
-out=$(run_setup_ps1 -Agent codex -OutDir "$out_dir")
-rc=$?
-if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
-# SKILL.md tells a Codex user this exact line is the success signal, since no path is printed.
-assert_contains 'setup-mcp: registered chrome-devtools with the Codex CLI' "$out"
-if [ ! -e "$out_dir/.mcp.json" ] && [ ! -e "$out_dir/opencode.json" ]; then
-  _ok "output directory was not used by codex"
-else
-  _fail "codex wrote a project config"
-fi
 
 test_case "ps1 setup: -NoRedact omits the redaction flag"
 link_host_tool pwsh
@@ -519,7 +450,7 @@ assert_contains 'setup-mcp: unknown option -Bogus' "$out"
 
 test_case "ps1 setup: a repeated option exits 2"
 link_host_tool pwsh
-out=$(run_setup_ps1 -Agent claude -Agent codex)
+out=$(run_setup_ps1 -Agent claude -Agent opencode)
 rc=$?
 if [ "$rc" -eq 2 ]; then _ok "exit 2"; else _fail "expected exit 2, got $rc"; fi
 assert_contains 'setup-mcp: repeated option -Agent' "$out"
@@ -573,7 +504,7 @@ assert_contains 'setup-mcp: unknown option --' "$out"
 
 test_case "ps1 setup: -h and --help print usage and exit 0"
 link_host_tool pwsh
-usage='usage: setup-mcp.ps1 -Agent auto|claude|codex|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact]'
+usage='usage: setup-mcp.ps1 -Agent auto|claude|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact]'
 out=$(run_setup_ps1 -h)
 rc=$?
 if [ "$rc" -eq 0 ]; then _ok "-h exits 0"; else _fail "expected -h exit 0, got $rc"; fi
@@ -666,14 +597,5 @@ run_setup_ps1 -Agent opencode >/dev/null
 rc=$?
 if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
 assert_contains 'chrome-devtools' "$(cat "$SANDBOX/project/opencode.json")"
-
-test_case "ps1 setup: absent Codex CLI requires manual merge"
-link_host_tool pwsh
-stub_cmd npx 'exit 0'
-out=$(run_setup_ps1 -Agent codex)
-rc=$?
-if [ "$rc" -eq 3 ]; then _ok "exit 3"; else _fail "expected exit 3, got $rc"; fi
-assert_contains 'global' "$out"
-assert_contains 'codex mcp add' "$out"
 
 fi

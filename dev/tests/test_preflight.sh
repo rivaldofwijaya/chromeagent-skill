@@ -209,17 +209,6 @@ write_mcp_json "$SANDBOX/project/.cursor/mcp.json"
 out=$(run_preflight)
 assert_kv MCP_CONFIGURED yes "$out"
 
-test_case "config: the global codex config is detected"
-ready_chrome
-mkdir -p "$HOME/.codex"
-cat > "$HOME/.codex/config.toml" <<'TOML'
-[mcp_servers.chrome-devtools]
-command = "npx"
-args = ["-y", "chrome-devtools-mcp@latest", "--autoConnect", "--redactNetworkHeaders"]
-TOML
-out=$(run_preflight)
-assert_kv MCP_CONFIGURED yes "$out"
-
 test_case "config: a chrome-devtools entry without autoConnect does not count"
 ready_chrome
 mkdir -p "$SANDBOX/project"

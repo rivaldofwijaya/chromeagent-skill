@@ -68,11 +68,11 @@ fi
 test_case "setup: refuses dangling symlink targets without creating pointed-at files"
 stub_cmd uname 'echo Darwin'
 stub_cmd npx 'exit 0'
-mkdir -p "$HOME/.codex"
+mkdir -p "$HOME/elsewhere"
 for agent in claude opencode; do
   if [ "$agent" = claude ]; then target_name=.mcp.json; else target_name=opencode.json; fi
   target="$SANDBOX/project/$target_name"
-  pointed_to="$HOME/.codex/config.toml"
+  pointed_to="$HOME/elsewhere/config.json"
   if ! make_symlink "$pointed_to" "$target"; then
     _skip "this platform will not create a symlink (Windows: needs admin or Developer Mode)"
     break
@@ -137,7 +137,7 @@ test_case "setup: help documents --out-dir"
 out=$(run_setup --help)
 rc=$?
 assert_setup_rc 0 "$rc"
-usage='usage: setup-mcp.sh --agent auto|claude|codex|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact]'
+usage='usage: setup-mcp.sh --agent auto|claude|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact]'
 case "$out" in
   *"$usage"*) _ok "usage includes --out-dir" ;;
   *) _fail "usage does not include --out-dir" ;;
@@ -329,25 +329,6 @@ body=$(cat "$SANDBOX/project/opencode.json")
 assert_contains '"other"' "$body"
 assert_contains 'chrome-devtools' "$body"
 
-test_case "setup codex: runs codex mcp add when the CLI is present"
-stub_cmd uname 'echo Darwin'
-stub_cmd npx 'exit 0'
-stub_cmd codex "printf '%s\n' \"CODEX_CALLED \$*\" >> \"\$HOME/codex.log\""
-out=$(run_setup --agent codex)
-log=$(cat "$HOME/codex.log")
-assert_contains 'CODEX_CALLED mcp add' "$log"
-assert_contains 'autoConnect' "$log"
-assert_contains 'global' "$out"
-# SKILL.md tells a Codex user this exact line is the success signal, since no path is printed.
-assert_contains 'setup-mcp: registered chrome-devtools with the Codex CLI' "$out"
-
-test_case "setup codex: prints the command when the CLI is absent"
-stub_cmd uname 'echo Darwin'
-stub_cmd npx 'exit 0'
-out=$(run_setup --agent codex)
-assert_contains 'codex mcp add' "$out"
-assert_contains 'global' "$out"
-
 test_case "setup auto: configures every detected agent"
 stub_cmd uname 'echo Darwin'
 stub_cmd npx 'exit 0'
@@ -385,58 +366,6 @@ if link_host_tool node; then
 else
   _fail "host node unavailable"
 fi
-
-test_case "setup auto: does not invoke codex from PATH"
-stub_cmd uname 'echo Darwin'
-stub_cmd npx 'exit 0'
-stub_cmd codex 'printf "%s\n" invoked > "$HOME/auto-codex.log"'
-out=$(run_setup --agent auto)
-rc=$?
-assert_setup_rc 0 "$rc"
-if [ ! -e "$HOME/auto-codex.log" ]; then
-  _ok "codex stub was not invoked"
-else
-  _fail "codex stub was invoked"
-fi
-
-test_case "setup auto: does not modify the global codex config"
-stub_cmd uname 'echo Darwin'
-stub_cmd npx 'exit 0'
-mkdir -p "$HOME/.codex"
-printf '%s\n' 'existing = true' > "$HOME/.codex/config.toml"
-cp "$HOME/.codex/config.toml" "$SANDBOX/codex-config.before"
-out=$(run_setup --agent auto)
-rc=$?
-assert_setup_rc 0 "$rc"
-assert_contains "setup-mcp: codex detected but not configured; run --agent codex to update your global Codex config." "$out"
-if link_host_tool cmp; then
-  if cmp -s "$SANDBOX/codex-config.before" "$HOME/.codex/config.toml"; then
-    _ok "global codex config is byte-identical"
-  else
-    _fail "global codex config was modified"
-  fi
-else
-  _fail "host cmp unavailable"
-fi
-
-test_case "setup auto: prints one codex notice for a PATH codex"
-stub_cmd uname 'echo Darwin'
-stub_cmd npx 'exit 0'
-stub_cmd codex 'exit 0'
-out=$(run_setup --agent auto)
-rc=$?
-assert_setup_rc 0 "$rc"
-codex_notice='setup-mcp: codex detected but not configured; run --agent codex to update your global Codex config.'
-notice_count=$(printf '%s\n' "$out" | grep -F -x -c -- "$codex_notice")
-if [ "$notice_count" -eq 1 ]; then _ok "codex notice printed once"; else _fail "codex notice count was $notice_count"; fi
-
-test_case "setup auto: does not print a codex notice when codex is absent"
-stub_cmd uname 'echo Darwin'
-stub_cmd npx 'exit 0'
-out=$(run_setup --agent auto)
-rc=$?
-assert_setup_rc 0 "$rc"
-assert_not_contains 'setup-mcp: codex detected but not configured' "$out"
 
 test_case "setup auto: an opencode marker beats a PATH-only claude"
 stub_cmd uname "echo Darwin"
@@ -615,7 +544,7 @@ assert_contains 'setup-mcp: --out-dir requires a value' "$out"
 test_case "setup: repeated options are usage errors and terminate"
 stub_cmd uname 'echo Darwin'
 stub_cmd npx 'exit 0'
-out=$(run_setup_timeout 5 --agent claude --agent codex)
+out=$(run_setup_timeout 5 --agent claude --agent opencode)
 assert_contains 'rc=2' "$out"
 out=$(run_setup_timeout 5 --runner bunx --runner pnpm)
 assert_contains 'rc=2' "$out"

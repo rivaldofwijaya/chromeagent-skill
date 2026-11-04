@@ -1,6 +1,6 @@
 #!/bin/sh
 # setup-mcp.sh — write a project-scope chrome-devtools MCP entry.
-# Usage: setup-mcp.sh --agent auto|claude|codex|opencode
+# Usage: setup-mcp.sh --agent auto|claude|opencode
 #                     [--runner "<argv>"] [--channel beta|dev|canary]
 #                     [--out-dir <dir>] [--no-redact]
 set -u
@@ -65,13 +65,13 @@ while [ $# -gt 0 ]; do
       SEEN_NO_REDACT=yes
       REDACT=no; shift
       ;;
-    -h|--help) printf 'usage: setup-mcp.sh --agent auto|claude|codex|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact]\n'; exit 0 ;;
+    -h|--help) printf 'usage: setup-mcp.sh --agent auto|claude|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact]\n'; exit 0 ;;
     *) printf 'setup-mcp: unknown option %s\n' "$1" >&2; exit 2 ;;
   esac
 done
 
 case "$AGENT" in
-  auto|claude|codex|opencode) : ;;
+  auto|claude|opencode) : ;;
   *) printf 'setup-mcp: unknown agent %s\n' "$AGENT" >&2; exit 2 ;;
 esac
 
@@ -281,27 +281,6 @@ write_opencode() {
     https://opencode.ai/config.json
 }
 
-write_codex() {
-  rc=$(runner_command)
-  cmd=${rc%%|*}
-  prefix=${rc#*|}
-  set -- mcp add chrome-devtools -- "$cmd" $prefix $(mcp_args)
-  printf 'setup-mcp: Codex has no project-scoped MCP config; this writes to your GLOBAL Codex config (~/.codex/config.toml).\n'
-  printf "setup-mcp: this is Codex's global config, not a project config.\n"
-  if command -v codex >/dev/null 2>&1; then
-    codex "$@" && {
-      printf 'setup-mcp: registered chrome-devtools with the Codex CLI\n'
-      return 0
-    }
-    printf 'setup-mcp: "codex %s" failed; run it yourself:\n' "$*"
-    printf 'codex %s\n' "$*"
-    return 3
-  fi
-  printf 'setup-mcp: the codex CLI is not on PATH. Run this yourself:\n'
-  printf 'codex %s\n' "$*"
-  return 3
-}
-
 # Prints the agents in play, space separated.
 detect_agents() {
   found=""
@@ -324,13 +303,7 @@ case "$AGENT" in
   opencode)
     write_opencode || record_rc "$?"
     ;;
-  codex)
-    write_codex || record_rc "$?"
-    ;;
   auto)
-    if [ -f "$HOME/.codex/config.toml" ] || command -v codex >/dev/null 2>&1; then
-      printf 'setup-mcp: codex detected but not configured; run --agent codex to update your global Codex config.\n'
-    fi
     for a in $(detect_agents); do
       case "$a" in
         claude) write_claude || record_rc "$?" ;;

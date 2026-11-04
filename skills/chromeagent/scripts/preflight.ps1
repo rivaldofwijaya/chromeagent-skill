@@ -3,8 +3,8 @@
 $ErrorActionPreference = 'SilentlyContinue'
 $CHROME_MIN_MAJOR = 144
 $Root = $env:CHROMEAGENT_ROOT
-# The home directory the agents themselves use. Claude Code, Codex, and
-# OpenCode resolve it from USERPROFILE on Windows and HOME elsewhere;
+# The home directory the agents themselves use. Claude Code and OpenCode
+# resolve it from USERPROFILE on Windows and HOME elsewhere;
 # PowerShell's own $HOME ignores both variables on Windows.
 $OnWindows = ($PSVersionTable.PSVersion.Major -lt 6) -or $IsWindows
 $UserHome = if ($OnWindows -and $env:USERPROFILE) { $env:USERPROFILE }
@@ -148,8 +148,6 @@ function Get-ConfigFile {
   }
   $paths = @(
     './.mcp.json', './.vscode/mcp.json', './.cursor/mcp.json', './opencode.json',
-    './.codex/config.toml',
-    (Join-Path $UserHome '.codex/config.toml'),
     (Join-Path $UserHome '.config/opencode/opencode.json')
   )
   foreach ($p in $paths) {

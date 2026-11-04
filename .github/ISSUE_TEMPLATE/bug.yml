@@ -44,4 +44,4 @@ body:
     id: agent
     attributes:
       label: Coding agent
-      placeholder: "Claude Code, Codex CLI, Cursor, ..."
+      placeholder: "Claude Code, OpenCode, Cursor, ..."

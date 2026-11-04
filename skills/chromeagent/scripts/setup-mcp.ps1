@@ -6,12 +6,6 @@ $script:ExitCode = 0
 # Pinned rather than @latest, for the reason given in setup-mcp.sh. Keep it equal
 # to CDM_PACKAGE there and the pin in .claude-plugin/plugin.json.
 $CdmPackage = 'chrome-devtools-mcp@1.12.0'
-# The home directory Codex itself uses, as in preflight.ps1: USERPROFILE on
-# Windows and HOME elsewhere; PowerShell's own $HOME ignores both on Windows.
-$OnWindows = ($PSVersionTable.PSVersion.Major -lt 6) -or $IsWindows
-$UserHome = if ($OnWindows -and $env:USERPROFILE) { $env:USERPROFILE }
-            elseif (-not $OnWindows -and $env:HOME) { $env:HOME }
-            else { $HOME }
 
 function Write-Info([string]$Message) {
   [Console]::Out.WriteLine($Message)
@@ -38,7 +32,7 @@ function Get-RawArguments {
 $rawArguments = @(Get-RawArguments -RawArguments @($args))
 
 function Write-Usage {
-  Write-Info 'usage: setup-mcp.ps1 -Agent auto|claude|codex|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact]'
+  Write-Info 'usage: setup-mcp.ps1 -Agent auto|claude|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact]'
 }
 
 function Stop-Usage([string]$Message) {
@@ -115,7 +109,7 @@ $OutDirSet = $values.ContainsKey('OutDir')
 $OutDir = if ($OutDirSet) { $values['OutDir'] } else { '' }
 
 # Validate manually so a bad value follows setup-mcp.sh's exit-2 contract.
-if (@('auto', 'claude', 'codex', 'opencode') -cnotcontains $Agent) {
+if (@('auto', 'claude', 'opencode') -cnotcontains $Agent) {
   Write-ErrorLine "setup-mcp: unknown agent $Agent"
   exit 2
 }
@@ -363,33 +357,6 @@ function Write-Opencode {
   Write-Info "setup-mcp: $(if ($hadFile) { 'merged chrome-devtools into' } else { 'wrote' }) $target"
 }
 
-function Write-Codex {
-  try {
-    $r = Get-RunnerParts
-    $cmd = @('mcp', 'add', 'chrome-devtools', '--') + @($r.Command) + @($r.Args) + @(Get-ServerArgs)
-    Write-Info 'setup-mcp: Codex has no project-scoped MCP config; this writes to your GLOBAL Codex config (~/.codex/config.toml).'
-    Write-Info "setup-mcp: this is Codex's global config, not a project config."
-    if (Get-Command codex -ErrorAction SilentlyContinue) {
-      & codex @cmd
-      $codexRc = $LASTEXITCODE
-      if ($codexRc -eq 0) {
-        Write-Info 'setup-mcp: registered chrome-devtools with the Codex CLI'
-      } else {
-        Write-ErrorLine "setup-mcp: \"codex $($cmd -join ' ')\" failed; run it yourself:"
-        Write-Info "codex $($cmd -join ' ')"
-        Set-ExitCode 3
-      }
-    } else {
-      Write-Info 'setup-mcp: the codex CLI is not on PATH. Run this yourself:'
-      Write-Info "codex $($cmd -join ' ')"
-      Set-ExitCode 3
-    }
-  } catch {
-    Write-ErrorLine $_.Exception.Message
-    Set-ExitCode 3
-  }
-}
-
 function Get-DetectedAgents {
   $found = @()
   $claudeConfigPath = Join-Path $resolvedOutDir '.mcp.json'
@@ -406,22 +373,12 @@ function Get-DetectedAgents {
   return @($found)
 }
 
-function Test-CodexPresent {
-  $codexConfigPath = Join-Path (Join-Path $UserHome '.codex') 'config.toml'
-  $codexCommand = Get-Command codex -ErrorAction SilentlyContinue
-  return ((Test-Path -LiteralPath $codexConfigPath -PathType Leaf) -or ($null -ne $codexCommand))
-}
-
 try {
   $targets = if ($Agent -eq 'auto') { Get-DetectedAgents } else { @($Agent) }
-  if (($Agent -eq 'auto') -and (Test-CodexPresent)) {
-    Write-Info 'setup-mcp: codex detected but not configured; run -Agent codex to update your global Codex config.'
-  }
   foreach ($target in $targets) {
     switch ($target) {
       'claude'   { Write-Claude }
       'opencode' { Write-Opencode }
-      'codex'    { Write-Codex }
     }
   }
   Write-Info 'setup-mcp: restart your agent so it loads the MCP server.'

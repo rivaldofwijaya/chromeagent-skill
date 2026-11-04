@@ -37,7 +37,6 @@ done
 test_case "SKILL.md: the decision table routes each verdict to its remedy"
 skill_assert_fixed 'reload' "$(table_row READY)"
 skill_assert_fixed '--agent auto' "$(table_row NOT_CONFIGURED)"
-skill_assert_fixed '--agent codex' "$(table_row NOT_CONFIGURED)"
 skill_assert_fixed 'references/setup.md' "$(table_row NOT_CONFIGURED)"
 skill_assert_fixed 'reload' "$(table_row NOT_CONFIGURED)"
 skill_assert_fixed 'chrome://inspect/#remote-debugging' "$(table_row NEEDS_OPT_IN)"
@@ -105,16 +104,12 @@ run_setup --agent opencode >/dev/null
 readme=$(cat "$README_FILE")
 claude_args=$(sed -n 's/^ *"args": //p' "$SANDBOX/project/.mcp.json")
 opencode_command=$(sed -n 's/^ *"command": //p' "$SANDBOX/project/opencode.json")
-codex_line="codex mcp add chrome-devtools -- npx $(printf '%s' "$claude_args" | tr -d '[]",')"
 skill_assert_fixed "\"args\": $claude_args" "$readme"
-skill_assert_fixed "args = $claude_args" "$readme"
 skill_assert_fixed "\"command\": $opencode_command" "$readme"
-skill_assert_fixed "$codex_line" "$readme"
 # Every config line, not just one copy: README repeats the args in several
 # snippets, and a stale copy must not hide behind a correct one.
-stale=$(printf '%s\n' "$readme" | sed 's/^ *//' | grep -E '^("args": |args = |"command": \[|codex mcp add )' |
-  grep -v -x -F -e "\"args\": $claude_args" -e "args = $claude_args" \
-    -e "\"command\": $opencode_command" -e "$codex_line")
+stale=$(printf '%s\n' "$readme" | sed 's/^ *//' | grep -E '^("args": |"command": \[)' |
+  grep -v -x -F -e "\"args\": $claude_args" -e "\"command\": $opencode_command")
 if [ -n "$stale" ]; then _fail "README has a config line setup does not write: $stale"
 else _ok "every README config line matches setup's output"; fi
 
@@ -129,7 +124,7 @@ done
 
 test_case "docs: README lists every supported agent and the requirements"
 readme=$(cat "$README_FILE")
-for expected in '| Claude Code |' '| OpenCode |' '| Codex |' '| Cursor |' '| VS Code |' \
+for expected in '| Claude Code |' '| OpenCode |' '| Cursor |' '| VS Code |' \
   'Chrome 144' 'chrome://inspect/#remote-debugging' 'Node 20.19+'; do
   skill_assert_fixed "$expected" "$readme"
 done
@@ -143,16 +138,6 @@ skill_assert_fixed '## `READY` but the MCP tools are absent from the session' "$
 skill_assert_fixed '## Config was written to the wrong directory' "$body"
 skill_assert_fixed '## Existing config could not be merged' "$body"
 skill_assert_fixed 'Node 20.19+, 22.12+, or 23+' "$body"
-skill_assert_fixed '`startup_timeout_sec = 20`' "$body"
-
-test_case "docs: no remediation hands a Codex user an unconditional auto"
-# Every line that prescribes an `auto` invocation must name the codex
-# alternative on the same line; `auto` never configures Codex.
-# setup.md is exempt: it lists the auto and codex commands on separate lines
-# under their host names.
-unconditional=$(grep -F -e 'setup-mcp.sh --agent auto' -e 'setup-mcp.ps1 -Agent auto' "$TROUBLE_FILE" | grep -F -v -- 'codex')
-if [ -n "$unconditional" ]; then _fail "troubleshooting.md prescribes an unconditional target: $unconditional"
-else _ok "every troubleshooting.md auto invocation names the codex alternative"; fi
 
 test_case "docs: reference links resolve"
 for ref in $(grep -o 'references/[a-z-]*\.md' "$SKILL_FILE" "$TROUBLE_FILE" | sed 's/^[^:]*://' | sort -u); do

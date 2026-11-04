@@ -59,25 +59,19 @@ Set-Location /path/to/your/project
 pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto
 ```
 
-`--agent auto` (or `-Agent auto`) targets the project-scoped agents only; if the host you are
-setting up is the Codex CLI, run the same command with `--agent codex` (or `-Agent codex`),
-which writes your global `~/.codex/config.toml`.
-
 Restart your agent afterwards. MCP config is read at startup.
 
 Both setup scripts resolve paths relative to the current working directory, so run them from the project root; the skill's own directory is never the right place. Invoke the scripts by their absolute path from the project-root shell. If the working directory cannot be the project root, pass `--out-dir "<dir>"` (or `-OutDir "<dir>"`) as the explicit output override. Preflight scans config paths relative to its own current working directory and has no `--out-dir`/`-OutDir` override. If setup writes elsewhere, run preflight from that output directory; otherwise it reports `NOT_CONFIGURED` even though the config exists.
 
-`auto` configures project-scoped agents only (Claude Code and OpenCode); Codex requires an explicit `--agent codex` and writes the user's global `~/.codex/config.toml`.
+For `auto`, markers in the resolved output directory select the target: `.mcp.json` or `.claude/` selects Claude Code, and `opencode.json` selects OpenCode. With no marker, `auto` falls back to Claude Code.
 
-For `auto`, markers in the resolved output directory select the project target: `.mcp.json` or `.claude/` selects Claude Code, and `opencode.json` selects OpenCode. With no marker, `auto` falls back to Claude Code. It never writes Codex's global config. When Codex is present, POSIX prints `setup-mcp: codex detected but not configured; run --agent codex to update your global Codex config.` and PowerShell prints `setup-mcp: codex detected but not configured; run -Agent codex to update your global Codex config.`
-
-For project targets: a successful setup prints the absolute path it wrote; check that path against the project root. For Codex there is no printed path to check: success is the line `setup-mcp: registered chrome-devtools with the Codex CLI` and exit 0, and the file written is `~/.codex/config.toml`, not the project root; the output override does not change its global scope. `--out-dir` and `-OutDir` require an existing directory; neither script creates it.
+A successful setup prints the absolute path it wrote; check that path against the project root. `--out-dir` and `-OutDir` require an existing directory; neither script creates it.
 
 The help output is:
 
-`usage: setup-mcp.sh --agent auto|claude|codex|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact]`
+`usage: setup-mcp.sh --agent auto|claude|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact]`
 
-`usage: setup-mcp.ps1 -Agent auto|claude|codex|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact]`
+`usage: setup-mcp.ps1 -Agent auto|claude|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact]`
 
 ### Per agent
 
@@ -85,11 +79,10 @@ The help output is:
 |---|---|---|
 | Claude Code | `./.mcp.json` | project |
 | OpenCode | `./opencode.json` (`mcp` key, `type: "local"`) | project |
-| Codex | `codex mcp add …` → `~/.codex/config.toml` | **global**, since Codex has no project scope |
 | Cursor | `./.cursor/mcp.json`, same shape as `.mcp.json`; write it yourself or copy the snippet | project |
 | VS Code | `./.vscode/mcp.json`, top-level `servers` shape; write it yourself or copy the VS Code snippet | project |
 
-Preflight detects all five locations, so a hand-written Cursor or VS Code config counts as configured.
+Preflight detects all four locations, so a hand-written Cursor or VS Code config counts as configured.
 It also reads a server registered with `claude mcp add`, at user scope or at local scope for the
 current project, from `~/.claude.json`; that check needs Node.
 
@@ -122,24 +115,6 @@ arguments.
     }
   }
 }
-```
-
-### Codex config (`~/.codex/config.toml`)
-
-Codex is registered through its CLI rather than a file you write, and it has no project scope, so
-this touches your **global** Codex config. Use the explicit `setup-mcp.sh --agent codex` (or
-`pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent codex`) when you want to update it:
-
-```bash
-codex mcp add chrome-devtools -- npx -y chrome-devtools-mcp@1.12.0 --autoConnect --redactNetworkHeaders --no-performance-crux --no-file-navigations --no-usage-statistics
-```
-
-That produces:
-
-```toml
-[mcp_servers.chrome-devtools]
-command = "npx"
-args = ["-y", "chrome-devtools-mcp@1.12.0", "--autoConnect", "--redactNetworkHeaders", "--no-performance-crux", "--no-file-navigations", "--no-usage-statistics"]
 ```
 
 ### VS Code config (`.vscode/mcp.json`)

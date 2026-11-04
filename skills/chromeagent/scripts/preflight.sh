@@ -190,8 +190,6 @@ scan_config() {
     "./.vscode/mcp.json" \
     "./.cursor/mcp.json" \
     "./opencode.json" \
-    "./.codex/config.toml" \
-    "$HOME/.codex/config.toml" \
     "$HOME/.config/opencode/opencode.json"
   do
     [ -f "$f" ] || continue
