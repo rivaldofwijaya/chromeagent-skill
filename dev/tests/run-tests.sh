@@ -91,12 +91,20 @@ ps_path() {
 
 # deny_writes DIR / allow_writes DIR — make DIR refuse new entries, and undo
 # it. chmod does this on Unix; on Windows chmod does not reach the ACL, so a
-# deny entry for the current user does the same job.
+# deny entry for the current user does the same job. deny_writes exits 1, with
+# DIR left writable, when the denial does not hold: root ignores chmod, and an
+# elevated Windows process (a CI runner) gets backup privileges from MSYS that
+# bypass the ACL. Callers skip rather than report a false failure.
 deny_writes() {
   if [ -n "$DLL_DIR" ]; then
     MSYS2_ARG_CONV_EXCL='*' "$ICACLS" "$(win_dir "$1")" /deny "$USERNAME:(WD,AD,DC)" >/dev/null
   else
     chmod 500 "$1"
+  fi
+  if ( : > "$1/.deny-writes-probe" ) 2>/dev/null; then
+    rm -f "$1/.deny-writes-probe"
+    allow_writes "$1"
+    return 1
   fi
 }
 allow_writes() {

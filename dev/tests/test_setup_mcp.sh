@@ -214,30 +214,34 @@ assert_contains 'invalid channel' "$out"
 test_case "setup claude: failed merge leaves the existing file intact"
 stub_cmd uname 'echo Darwin'
 stub_cmd npx 'exit 0'
-if link_host_tool node; then
-  printf '%s\n' '{"mcpServers":{"other-server":{"command":"other","args":["original"]}}}' > "$SANDBOX/project/.mcp.json"
+if ! link_host_tool node; then
+  _fail "host node unavailable"
+elif printf '%s\n' '{"mcpServers":{"other-server":{"command":"other","args":["original"]}}}' > "$SANDBOX/project/.mcp.json" &&
+     ! deny_writes "$SANDBOX/project"; then
+  _skip "a read-only directory cannot be enforced here (root, or an elevated Windows shell)"
+else
   before=$(cat "$SANDBOX/project/.mcp.json")
-  deny_writes "$SANDBOX/project"
   out=$(run_setup --agent claude)
   rc=$?
   allow_writes "$SANDBOX/project"
   after=$(cat "$SANDBOX/project/.mcp.json")
   assert_setup_rc 3 "$rc"
   if [ "$before" = "$after" ]; then _ok "file survived failed merge"; else _fail "file was modified by failed merge"; fi
-else
-  _fail "host node unavailable"
 fi
 
 test_case "setup claude: failed create is reported as failure"
 stub_cmd uname 'echo Darwin'
 stub_cmd npx 'exit 0'
-deny_writes "$SANDBOX/project"
-out=$(run_setup --agent claude)
-rc=$?
-allow_writes "$SANDBOX/project"
-assert_setup_rc 3 "$rc"
-assert_contains "setup-mcp: failed to write $SANDBOX/project/.mcp.json" "$out"
-assert_not_contains "wrote $SANDBOX/project/.mcp.json" "$out"
+if deny_writes "$SANDBOX/project"; then
+  out=$(run_setup --agent claude)
+  rc=$?
+  allow_writes "$SANDBOX/project"
+  assert_setup_rc 3 "$rc"
+  assert_contains "setup-mcp: failed to write $SANDBOX/project/.mcp.json" "$out"
+  assert_not_contains "wrote $SANDBOX/project/.mcp.json" "$out"
+else
+  _skip "a read-only directory cannot be enforced here (root, or an elevated Windows shell)"
+fi
 
 test_case "setup claude: an existing file is merged, not clobbered"
 stub_cmd uname 'echo Darwin'
@@ -311,13 +315,16 @@ assert_contains 'autoConnect' "$body"
 test_case "setup opencode: failed create exits 3"
 stub_cmd uname 'echo Darwin'
 stub_cmd npx 'exit 0'
-deny_writes "$SANDBOX/project"
-out=$(run_setup --agent opencode)
-rc=$?
-allow_writes "$SANDBOX/project"
-assert_setup_rc 3 "$rc"
-assert_contains "setup-mcp: failed to write $SANDBOX/project/opencode.json" "$out"
-assert_not_contains "wrote $SANDBOX/project/opencode.json" "$out"
+if deny_writes "$SANDBOX/project"; then
+  out=$(run_setup --agent opencode)
+  rc=$?
+  allow_writes "$SANDBOX/project"
+  assert_setup_rc 3 "$rc"
+  assert_contains "setup-mcp: failed to write $SANDBOX/project/opencode.json" "$out"
+  assert_not_contains "wrote $SANDBOX/project/opencode.json" "$out"
+else
+  _skip "a read-only directory cannot be enforced here (root, or an elevated Windows shell)"
+fi
 
 test_case "setup opencode: merges into an existing opencode.json under the mcp key"
 stub_cmd uname 'echo Darwin'
