@@ -373,6 +373,54 @@ assert_contains '"topNull": null' "$body"
 assert_contains '"topPrimitive": "plain"' "$body"
 assert_contains '"number": 42' "$body"
 
+test_case "ps1 setup: a global chrome-devtools-mcp is the last-resort runner, without a package spec"
+link_host_tool pwsh
+stub_cmd chrome-devtools-mcp 'exit 0'
+out=$(run_setup_ps1 -Agent claude)
+rc=$?
+if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
+body=$(tr -d ' \r\n' < "$SANDBOX/project/.mcp.json")
+assert_contains_text '"command":"chrome-devtools-mcp","args":["--autoConnect"' "$body"
+assert_not_contains 'chrome-devtools-mcp@' "$body"
+run_setup_ps1 -Agent opencode >/dev/null
+body=$(tr -d ' \r\n' < "$SANDBOX/project/opencode.json")
+assert_contains_text '"command":["chrome-devtools-mcp","--autoConnect"' "$body"
+assert_not_contains 'chrome-devtools-mcp@' "$body"
+
+test_case "ps1 setup: -Runner naming the global binary omits the package spec"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+for runner in chrome-devtools-mcp 'C:\nodejs\chrome-devtools-mcp.cmd'; do
+  rm -f "$SANDBOX/project/.mcp.json"
+  run_setup_ps1 -Agent claude -Runner "$runner" >/dev/null
+  body=$(tr -d ' \r\n' < "$SANDBOX/project/.mcp.json")
+  assert_contains_text '"args":["--autoConnect"' "$body"
+  assert_not_contains 'chrome-devtools-mcp@' "$body"
+done
+
+test_case "ps1 setup: an existing fallback entry is not replaced without -Force"
+link_host_tool pwsh
+stub_cmd npx 'exit 0'
+for agent in claude opencode; do
+  if [ "$agent" = claude ]; then f="$SANDBOX/project/.mcp.json"; key=mcpServers
+  else f="$SANDBOX/project/opencode.json"; key=mcp; fi
+  printf '{"%s":{"chrome-devtools":{"command":"npx","args":["-y","chrome-devtools-mcp@1.12.0","--browserUrl=http://127.0.0.1:9222"]}}}\n' "$key" > "$f"
+  before=$(cat "$f")
+  out=$(run_setup_ps1 -Agent "$agent")
+  rc=$?
+  if [ "$rc" -eq 3 ]; then _ok "exit 3"; else _fail "expected exit 3, got $rc"; fi
+  assert_contains 'already has a chrome-devtools entry without --autoConnect' "$out"
+  assert_contains 'pass -Force' "$out"
+  if [ "$(cat "$f")" = "$before" ]; then _ok "$agent fallback entry left untouched"
+  else _fail "$agent fallback entry was changed"; fi
+  out=$(run_setup_ps1 -Agent "$agent" -Force)
+  rc=$?
+  if [ "$rc" -eq 0 ]; then _ok "exit 0"; else _fail "expected exit 0, got $rc"; fi
+  body=$(cat "$f")
+  assert_contains 'autoConnect' "$body"
+  assert_not_contains 'browserUrl' "$body"
+done
+
 test_case "ps1 setup: writes opencode.json with a command array"
 link_host_tool pwsh
 stub_cmd npx 'exit 0'
@@ -463,6 +511,8 @@ out=$(run_setup_ps1_timeout 5 -Channel beta -Channel dev)
 assert_contains 'rc=2' "$out"
 out=$(run_setup_ps1_timeout 5 -NoRedact -NoRedact)
 assert_contains 'rc=2' "$out"
+out=$(run_setup_ps1_timeout 5 -Force -Force)
+assert_contains 'rc=2' "$out"
 
 test_case "ps1 setup: a repeated -OutDir is a usage error"
 link_host_tool pwsh
@@ -504,7 +554,7 @@ assert_contains 'setup-mcp: unknown option --' "$out"
 
 test_case "ps1 setup: -h and --help print usage and exit 0"
 link_host_tool pwsh
-usage='usage: setup-mcp.ps1 -Agent auto|claude|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact]'
+usage='usage: setup-mcp.ps1 -Agent auto|claude|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact] [-Force]'
 out=$(run_setup_ps1 -h)
 rc=$?
 if [ "$rc" -eq 0 ]; then _ok "-h exits 0"; else _fail "expected -h exit 0, got $rc"; fi

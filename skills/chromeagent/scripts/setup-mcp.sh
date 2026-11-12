@@ -2,7 +2,7 @@
 # setup-mcp.sh — write a project-scope chrome-devtools MCP entry.
 # Usage: setup-mcp.sh --agent auto|claude|opencode
 #                     [--runner "<argv>"] [--channel beta|dev|canary]
-#                     [--out-dir <dir>] [--no-redact]
+#                     [--out-dir <dir>] [--no-redact] [--force]
 set -u
 
 # The server version every config is written with. Pinned rather than @latest:
@@ -23,6 +23,7 @@ SEEN_RUNNER=no
 SEEN_CHANNEL=no
 SEEN_OUT_DIR=no
 SEEN_NO_REDACT=no
+FORCE=no
 
 # A value-taking option with no value left is a usage error, not a shift.
 # POSIX `shift 2` with one argument remaining shifts nothing and returns 1, so
@@ -65,7 +66,11 @@ while [ $# -gt 0 ]; do
       SEEN_NO_REDACT=yes
       REDACT=no; shift
       ;;
-    -h|--help) printf 'usage: setup-mcp.sh --agent auto|claude|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact]\n'; exit 0 ;;
+    --force)
+      [ "$FORCE" = no ] || { printf 'setup-mcp: repeated option %s\n' "$1" >&2; exit 2; }
+      FORCE=yes; shift
+      ;;
+    -h|--help) printf 'usage: setup-mcp.sh --agent auto|claude|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact] [--force]\n'; exit 0 ;;
     *) printf 'setup-mcp: unknown option %s\n' "$1" >&2; exit 2 ;;
   esac
 done
@@ -107,13 +112,28 @@ runner_command() {
   if command -v npx >/dev/null 2>&1; then printf 'npx|-y\n'
   elif command -v bunx >/dev/null 2>&1; then printf 'bunx|\n'
   elif command -v pnpm >/dev/null 2>&1; then printf 'pnpm|dlx\n'
+  elif command -v chrome-devtools-mcp >/dev/null 2>&1; then printf 'chrome-devtools-mcp|\n'
   else printf 'npx|-y\n'
   fi
 }
 
-# Prints the server args, space separated, package first.
+# is_global_cmd COMMAND — exit 0 when COMMAND is the installed
+# chrome-devtools-mcp binary itself rather than a package runner. It takes
+# server flags only: a package spec would reach it as a stray argument, and the
+# version is whatever the user installed.
+is_global_cmd() {
+  name=${1##*[/\\]}
+  case "$name" in
+    chrome-devtools-mcp|chrome-devtools-mcp.cmd|chrome-devtools-mcp.exe) return 0 ;;
+  esac
+  return 1
+}
+
+# mcp_args COMMAND — prints the server args, space separated: the package
+# first for a package runner, flags only for the global binary.
 mcp_args() {
-  printf '%s --autoConnect' "$CDM_PACKAGE"
+  is_global_cmd "$1" || printf '%s ' "$CDM_PACKAGE"
+  printf '%s' '--autoConnect'
   [ "$REDACT" = yes ] && printf ' --redactNetworkHeaders'
   # Performance traces otherwise send the traced URLs to the CrUX API; with a
   # real profile those URLs can be private.
@@ -136,7 +156,7 @@ args_json() {
   prefix="$1"
   first=1
   printf '['
-  for a in $prefix $(mcp_args); do
+  for a in $prefix $(mcp_args "$2"); do
     [ -n "$a" ] || continue
     [ $first -eq 1 ] || printf ', '
     escaped=$(json_escape "$a")
@@ -161,20 +181,25 @@ claude_snippet() {
 EOF
 }
 
-# merge_json_with_node FILE KEY ENTRY_JSON [SCHEMA_URL]
+# merge_json_with_node FILE KEY ENTRY_JSON FORCE [SCHEMA_URL]
 # Sets FILE's KEY["chrome-devtools"] to ENTRY_JSON, keeping everything else, and
-# sets "$schema" when SCHEMA_URL is given. Writes through a temp file and a
+# sets "$schema" when SCHEMA_URL is given. An existing chrome-devtools entry
+# without --autoConnect is a fallback someone configured on purpose
+# (--browserUrl, --isolated); it is replaced only when FORCE is yes. Writes through a temp file and a
 # rename, so a failure leaves the original untouched.
 merge_json_with_node() {
   node -e '
     const fs=require("fs");
     const path=require("path");
-    const [file,key,entry,schema]=process.argv.slice(1);
+    const [file,key,entry,force,schema]=process.argv.slice(1);
     let doc={};
     try{doc=JSON.parse(fs.readFileSync(file,"utf8"))}catch(e){
       console.error("setup-mcp: "+file+" is not valid JSON; not modifying it");process.exit(3)}
     if(doc===null||typeof doc!=="object"||Array.isArray(doc)){
       console.error("setup-mcp: "+file+" must contain a JSON object at the root; not modifying it");process.exit(3)}
+    const old=doc[key]&&typeof doc[key]==="object"&&!Array.isArray(doc[key])?doc[key]["chrome-devtools"]:undefined;
+    if(force!=="yes"&&old&&typeof old==="object"&&!JSON.stringify(old).includes("autoConnect")){
+      console.error("setup-mcp: "+file+" already has a chrome-devtools entry without --autoConnect; not replacing it (pass --force to replace it)");process.exit(3)}
     if(schema)doc.$schema=schema;
     if(doc[key]===null||typeof doc[key]!=="object"||Array.isArray(doc[key])) doc[key]={};
     doc[key]["chrome-devtools"]=JSON.parse(entry);
@@ -220,7 +245,7 @@ write_json_config() {
   fi
 
   if command -v node >/dev/null 2>&1; then
-    if merge_json_with_node "$target" "$key" "$entry" $schema; then
+    if merge_json_with_node "$target" "$key" "$entry" "$FORCE" $schema; then
       printf 'setup-mcp: merged chrome-devtools into %s\n' "$target"
       return 0
     fi
@@ -237,7 +262,7 @@ write_claude() {
   rc=$(runner_command)
   cmd=${rc%%|*}
   prefix=${rc#*|}
-  args=$(args_json "$prefix")
+  args=$(args_json "$prefix" "$cmd")
   entry=$(printf '{"command": "%s", "args": %s}' "$(json_escape "$cmd")" "$args")
   write_json_config "$OUT_DIR/.mcp.json" mcpServers "$entry" "$(claude_snippet "$cmd" "$args")"
 }
@@ -249,7 +274,7 @@ command_json() {
   prefix=${rc#*|}
   first=1
   printf '['
-  for a in "$cmd" $prefix $(mcp_args); do
+  for a in "$cmd" $prefix $(mcp_args "$cmd"); do
     [ -n "$a" ] || continue
     [ $first -eq 1 ] || printf ', '
     escaped=$(json_escape "$a")

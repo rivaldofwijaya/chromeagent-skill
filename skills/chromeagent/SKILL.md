@@ -63,7 +63,7 @@ Read the `STATUS` and branch. Verdict precedence is first failing check wins: `N
 | STATUS | Do this |
 |---|---|
 | `READY` | If the `chrome-devtools` tools are present, say nothing: `list_pages` → pick the tab (§5) → the user's task. If the tools are absent, do not call `list_pages` yet: the config may have just been written, so reload/restart the MCP connection, wait for the tools to appear, then continue. |
-| `NOT_CONFIGURED` | Run setup without asking, with `--agent auto` (`-Agent auto`), which reads markers in the output directory to choose between Claude Code and OpenCode. POSIX: `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto`; native Windows: `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent auto`. If `CHROME_CHANNEL` is not `stable`, or setup exits non-zero, read `references/setup.md` first: it has the channel flag, the exit codes, and the merge rules. On successful setup the config was just written; reload/restart the MCP connection before calling any tool, because MCP config is read at startup. |
+| `NOT_CONFIGURED` | Run setup without asking, naming the agent you are: `--agent claude` under Claude Code, `--agent opencode` under OpenCode (`-Agent` on Windows). POSIX: `sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent claude`; native Windows: `pwsh -File /path/to/chromeagent-skill/scripts/setup-mcp.ps1 -Agent claude`. `--agent auto` guesses from marker files and falls back to Claude Code, so it can write a config your agent never reads; use it only when you cannot tell which of the two you are. If `CHROME_CHANNEL` is not `stable`, or setup exits non-zero, read `references/setup.md` first: it has the channel flag, the exit codes, and the merge rules. Setup refuses (exit 3) to replace an existing `chrome-devtools` entry that lacks `--autoConnect`: that is a §4 fallback the user chose, so do not pass `--force` on your own; tell the user their fallback browser is not reachable and let them decide. On successful setup the config was just written; reload/restart the MCP connection before calling any tool, because MCP config is read at startup. |
 | `NEEDS_OPT_IN` | Stop. One instruction: "Open `chrome://inspect/#remote-debugging` in Chrome and click Allow." Then re-run preflight. |
 | `CHROME_NOT_RUNNING` | Ask the user to open Chrome normally, then re-run preflight. |
 | `CHROME_TOO_OLD` | Report the actual `CHROME_VERSION` found and that `--autoConnect` needs Chrome 144+. Offer the fallbacks below as an explicit choice. |
@@ -83,6 +83,12 @@ Both cost the user something. State the cost, let them pick.
 - `--isolated`, an MCP-launched throwaway profile. **Loses all cookies and logins.**
 
 Silent degradation is prohibited. Never quietly fall back to an isolated profile.
+
+Setup does not write a fallback. Once the user picks one, edit the `chrome-devtools` entry in the
+agent's MCP config by hand, replacing `--autoConnect` with the chosen flag, and reload. Preflight
+only recognises `--autoConnect`, so with a fallback in place it keeps reporting `NOT_CONFIGURED`
+(or `CHROME_TOO_OLD`); `list_pages` is then the only check, and the reverse rule holds too: never
+quietly replace the user's fallback with `--autoConnect`.
 
 ## 5. Working style once attached
 

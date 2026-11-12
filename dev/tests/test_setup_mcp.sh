@@ -137,7 +137,7 @@ test_case "setup: help documents --out-dir"
 out=$(run_setup --help)
 rc=$?
 assert_setup_rc 0 "$rc"
-usage='usage: setup-mcp.sh --agent auto|claude|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact]'
+usage='usage: setup-mcp.sh --agent auto|claude|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact] [--force]'
 case "$out" in
   *"$usage"*) _ok "usage includes --out-dir" ;;
   *) _fail "usage does not include --out-dir" ;;
@@ -202,6 +202,68 @@ if printf '%s\n' "$body" | grep -Fq '"command": "bun\"x"'; then
   _ok "runner quote is JSON-escaped"
 else
   _fail "runner quote was not JSON-escaped"
+fi
+
+test_case "setup: a global chrome-devtools-mcp is the last-resort runner, without a package spec"
+stub_cmd uname 'echo Darwin'
+stub_cmd chrome-devtools-mcp 'exit 0'
+run_setup --agent claude >/dev/null
+rc=$?
+assert_setup_rc 0 "$rc"
+body=$(cat "$SANDBOX/project/.mcp.json")
+assert_contains '"command": "chrome-devtools-mcp"' "$body"
+assert_contains '"args": \["--autoConnect"' "$body"
+assert_not_contains 'chrome-devtools-mcp@' "$body"
+run_setup --agent opencode >/dev/null
+body=$(cat "$SANDBOX/project/opencode.json")
+assert_contains '"command": \["chrome-devtools-mcp", "--autoConnect"' "$body"
+assert_not_contains 'chrome-devtools-mcp@' "$body"
+
+test_case "setup: a package runner still beats a global chrome-devtools-mcp"
+stub_cmd uname 'echo Darwin'
+stub_cmd chrome-devtools-mcp 'exit 0'
+stub_cmd pnpm 'exit 0'
+run_setup --agent claude >/dev/null
+body=$(cat "$SANDBOX/project/.mcp.json")
+assert_contains '"command": "pnpm"' "$body"
+assert_contains 'chrome-devtools-mcp@1.12.0' "$body"
+
+test_case "setup claude: --runner naming the global binary omits the package spec"
+stub_cmd uname 'echo Darwin'
+stub_cmd npx 'exit 0'
+for runner in chrome-devtools-mcp /opt/node/bin/chrome-devtools-mcp 'C:\nodejs\chrome-devtools-mcp.cmd'; do
+  rm -f "$SANDBOX/project/.mcp.json"
+  run_setup --agent claude --runner "$runner" >/dev/null
+  body=$(cat "$SANDBOX/project/.mcp.json")
+  assert_contains '"args": \["--autoConnect"' "$body"
+  assert_not_contains 'chrome-devtools-mcp@' "$body"
+done
+
+test_case "setup: an existing fallback entry is not replaced without --force"
+stub_cmd uname 'echo Darwin'
+stub_cmd npx 'exit 0'
+if link_host_tool node; then
+  for agent in claude opencode; do
+    if [ "$agent" = claude ]; then f="$SANDBOX/project/.mcp.json"; key=mcpServers
+    else f="$SANDBOX/project/opencode.json"; key=mcp; fi
+    printf '{"%s":{"chrome-devtools":{"command":"npx","args":["-y","chrome-devtools-mcp@1.12.0","--browserUrl=http://127.0.0.1:9222"]}}}\n' "$key" > "$f"
+    before=$(cat "$f")
+    out=$(run_setup --agent "$agent")
+    rc=$?
+    assert_setup_rc 3 "$rc"
+    assert_contains 'already has a chrome-devtools entry without --autoConnect' "$out"
+    assert_contains 'pass --force' "$out"
+    if [ "$(cat "$f")" = "$before" ]; then _ok "$agent fallback entry left untouched"
+    else _fail "$agent fallback entry was changed"; fi
+    out=$(run_setup --agent "$agent" --force)
+    rc=$?
+    assert_setup_rc 0 "$rc"
+    body=$(cat "$f")
+    assert_contains 'autoConnect' "$body"
+    assert_not_contains 'browserUrl' "$body"
+  done
+else
+  _fail "host node unavailable"
 fi
 
 test_case "setup claude: invalid --channel is a usage error"
@@ -560,6 +622,8 @@ assert_contains 'rc=2' "$out"
 out=$(run_setup_timeout 5 --out-dir "$SANDBOX/project" --out-dir "$SANDBOX/project")
 assert_contains 'rc=2' "$out"
 out=$(run_setup_timeout 5 --no-redact --no-redact)
+assert_contains 'rc=2' "$out"
+out=$(run_setup_timeout 5 --force --force)
 assert_contains 'rc=2' "$out"
 
 test_case "setup: repeated --out-dir is a usage error"

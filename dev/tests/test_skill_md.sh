@@ -36,7 +36,9 @@ done
 
 test_case "SKILL.md: the decision table routes each verdict to its remedy"
 skill_assert_fixed 'reload' "$(table_row READY)"
-skill_assert_fixed '--agent auto' "$(table_row NOT_CONFIGURED)"
+skill_assert_fixed '--agent claude' "$(table_row NOT_CONFIGURED)"
+skill_assert_fixed '--agent opencode' "$(table_row NOT_CONFIGURED)"
+skill_assert_fixed '--force' "$(table_row NOT_CONFIGURED)"
 skill_assert_fixed 'references/setup.md' "$(table_row NOT_CONFIGURED)"
 skill_assert_fixed 'reload' "$(table_row NOT_CONFIGURED)"
 skill_assert_fixed 'chrome://inspect/#remote-debugging' "$(table_row NEEDS_OPT_IN)"

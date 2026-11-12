@@ -32,7 +32,7 @@ function Get-RawArguments {
 $rawArguments = @(Get-RawArguments -RawArguments @($args))
 
 function Write-Usage {
-  Write-Info 'usage: setup-mcp.ps1 -Agent auto|claude|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact]'
+  Write-Info 'usage: setup-mcp.ps1 -Agent auto|claude|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact] [-Force]'
 }
 
 function Stop-Usage([string]$Message) {
@@ -44,8 +44,7 @@ function Stop-Usage([string]$Message) {
 # malformed trailing value can never leave the loop at the same index. Each
 # option is accepted once, as -Name value or -Name:value.
 $values = @{}
-$NoRedact = $false
-$noRedactSeen = $false
+$switches = @{}
 $index = 0
 while ($index -lt $rawArguments.Count) {
   $option = [string]$rawArguments[$index]
@@ -82,15 +81,15 @@ while ($index -lt $rawArguments.Count) {
     continue
   }
 
-  if ($optionName -ieq '-NoRedact') {
-    if ($noRedactSeen) { Stop-Usage "repeated option $option" }
-    $noRedactSeen = $true
+  $flag = @('NoRedact', 'Force') | Where-Object { $optionName -ieq "-$_" } | Select-Object -First 1
+  if ($flag) {
+    if ($switches.ContainsKey($flag)) { Stop-Usage "repeated option $option" }
     if ($null -eq $attachedValue) {
-      $NoRedact = $true
+      $switches[$flag] = $true
     } elseif (@('true', '$true') -contains $attachedValue) {
-      $NoRedact = $true
+      $switches[$flag] = $true
     } elseif (@('false', '$false') -contains $attachedValue) {
-      $NoRedact = $false
+      $switches[$flag] = $false
     } else {
       Stop-Usage "invalid value for $option"
     }
@@ -101,6 +100,8 @@ while ($index -lt $rawArguments.Count) {
   Stop-Usage "unknown option $option"
 }
 
+$NoRedact = $switches.ContainsKey('NoRedact') -and $switches['NoRedact']
+$Force = $switches.ContainsKey('Force') -and $switches['Force']
 $Agent = if ($values.ContainsKey('Agent')) { $values['Agent'] } else { 'auto' }
 $Runner = if ($values.ContainsKey('Runner')) { $values['Runner'] } else { '' }
 $ChannelSet = $values.ContainsKey('Channel')
@@ -155,11 +156,24 @@ function Get-RunnerParts {
   if (Get-Command pnpm -ErrorAction SilentlyContinue) {
     return [pscustomobject]@{ Command = 'pnpm'; Args = @('dlx') }
   }
+  if (Get-Command chrome-devtools-mcp -ErrorAction SilentlyContinue) {
+    return [pscustomobject]@{ Command = 'chrome-devtools-mcp'; Args = @() }
+  }
   return [pscustomobject]@{ Command = 'npx'; Args = @('-y') }
 }
 
-function Get-ServerArgs {
-  $argsList = @($CdmPackage, '--autoConnect')
+# True when the command is the installed chrome-devtools-mcp binary itself
+# rather than a package runner. It takes server flags only: a package spec would
+# reach it as a stray argument, and the version is whatever the user installed.
+function Test-GlobalCommand([string]$Command) {
+  $leaf = ($Command -split '[\\/]')[-1]
+  return @('chrome-devtools-mcp', 'chrome-devtools-mcp.cmd', 'chrome-devtools-mcp.exe') -contains $leaf
+}
+
+function Get-ServerArgs([string]$Command) {
+  $argsList = @()
+  if (-not (Test-GlobalCommand $Command)) { $argsList += $CdmPackage }
+  $argsList += '--autoConnect'
   if (-not $NoRedact) { $argsList += '--redactNetworkHeaders' }
   # Performance traces otherwise send the traced URLs to the CrUX API; with a
   # real profile those URLs can be private.
@@ -232,6 +246,17 @@ function Read-JsonFile([string]$Path) {
   }
 }
 
+# An existing chrome-devtools entry without --autoConnect is a fallback someone
+# configured on purpose (--browserUrl, --isolated); replace it only with -Force.
+function Assert-Replaceable([System.Collections.IDictionary]$Servers, [string]$Path) {
+  if ($Force -or -not $Servers.Contains('chrome-devtools')) { return }
+  $old = $Servers['chrome-devtools']
+  if (-not ($old -is [System.Collections.IDictionary])) { return }
+  if (($old | ConvertTo-Json -Depth 12 -Compress) -cnotmatch 'autoConnect') {
+    throw "setup-mcp: $Path already has a chrome-devtools entry without --autoConnect; not replacing it (pass -Force to replace it)"
+  }
+}
+
 function Write-JsonFile([string]$Path, $Document) {
   $directory = Split-Path -Parent $Path
   if (-not $directory) { $directory = '.' }
@@ -295,9 +320,10 @@ function Write-Claude {
         -not ($doc['mcpServers'] -is [System.Collections.IDictionary])) {
       $doc['mcpServers'] = [ordered]@{}
     }
+    Assert-Replaceable $doc['mcpServers'] $target
     $doc['mcpServers']['chrome-devtools'] = [ordered]@{
       command = $r.Command
-      args    = @($r.Args) + @(Get-ServerArgs)
+      args    = @($r.Args) + @(Get-ServerArgs $r.Command)
     }
   } catch {
     Write-ErrorLine $_.Exception.Message
@@ -337,10 +363,11 @@ function Write-Opencode {
         -not ($doc['mcp'] -is [System.Collections.IDictionary])) {
       $doc['mcp'] = [ordered]@{}
     }
+    Assert-Replaceable $doc['mcp'] $target
     $doc['mcp']['chrome-devtools'] = [ordered]@{
       type    = 'local'
       enabled = $true
-      command = @($r.Command) + @($r.Args) + @(Get-ServerArgs)
+      command = @($r.Command) + @($r.Args) + @(Get-ServerArgs $r.Command)
     }
   } catch {
     Write-ErrorLine $_.Exception.Message

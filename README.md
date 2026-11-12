@@ -63,15 +63,15 @@ Restart your agent afterwards. MCP config is read at startup.
 
 Both setup scripts resolve paths relative to the current working directory, so run them from the project root; the skill's own directory is never the right place. Invoke the scripts by their absolute path from the project-root shell. If the working directory cannot be the project root, pass `--out-dir "<dir>"` (or `-OutDir "<dir>"`) as the explicit output override. Preflight scans config paths relative to its own current working directory and has no `--out-dir`/`-OutDir` override. If setup writes elsewhere, run preflight from that output directory; otherwise it reports `NOT_CONFIGURED` even though the config exists.
 
-For `auto`, markers in the resolved output directory select the target: `.mcp.json` or `.claude/` selects Claude Code, and `opencode.json` selects OpenCode. With no marker, `auto` falls back to Claude Code.
+For `auto`, markers in the resolved output directory select the target: `.mcp.json` or `.claude/` selects Claude Code, and `opencode.json` selects OpenCode. With no marker, `auto` falls back to Claude Code, so in a fresh OpenCode project pass `--agent opencode`.
 
 A successful setup prints the absolute path it wrote; check that path against the project root. `--out-dir` and `-OutDir` require an existing directory; neither script creates it.
 
 The help output is:
 
-`usage: setup-mcp.sh --agent auto|claude|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact]`
+`usage: setup-mcp.sh --agent auto|claude|opencode [--runner "<argv>"] [--channel beta|dev|canary] [--out-dir <dir>] [--no-redact] [--force]`
 
-`usage: setup-mcp.ps1 -Agent auto|claude|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact]`
+`usage: setup-mcp.ps1 -Agent auto|claude|opencode [-Runner "<argv>"] [-Channel beta|dev|canary] [-OutDir <dir>] [-NoRedact] [-Force]`
 
 ### Per agent
 
@@ -137,9 +137,15 @@ stdio is the default.
 Flags: `--runner "<argv>"`, `--channel beta|dev|canary`, `--out-dir "<dir>"`, `--no-redact` to use
 something other than `npx`, select a non-stable Chrome, choose an explicit output directory, or stop
 redacting network headers (only when you are deliberately
-debugging auth headers).
-PowerShell: `-Runner "<argv>"`, `-Channel beta|dev|canary`, `-OutDir "<dir>"`, and `-NoRedact` with
-`setup-mcp.ps1`.
+debugging auth headers). `--force` replaces an existing `chrome-devtools` entry that lacks
+`--autoConnect` (a `--browserUrl` or `--isolated` fallback); without it setup leaves that entry alone
+and exits 3.
+PowerShell: `-Runner "<argv>"`, `-Channel beta|dev|canary`, `-OutDir "<dir>"`, `-NoRedact`, and
+`-Force` with `setup-mcp.ps1`.
+
+Without `npx`, setup falls back to `bunx`, `pnpm dlx`, then a globally installed
+`chrome-devtools-mcp`. The global binary is written without the package spec, so it runs whatever
+version you installed, not the pin.
 
 ## Check your setup
 

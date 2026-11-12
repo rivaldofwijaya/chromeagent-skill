@@ -12,7 +12,9 @@ No `npx`, `bunx`, `pnpm`, or global `chrome-devtools-mcp`.
 - Linux: your distro package, or `nvm install --lts`
 
 Then re-run preflight. If you cannot install Node, `bunx` or `pnpm dlx` work:
-`sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto --runner "bunx"`.
+`sh /path/to/chromeagent-skill/scripts/setup-mcp.sh --agent auto --runner "bunx"`. Setup picks up
+`bunx`, `pnpm`, or a globally installed `chrome-devtools-mcp` on its own when `npx` is absent;
+`--runner` is only for overriding that choice.
 
 ## `CHROME_MISSING`
 
@@ -66,6 +68,11 @@ Cause: POSIX `setup-mcp.sh` uses Node to parse and merge an existing JSON config
 merge when Node is unavailable. Invalid JSON and other existing-file setup failures also exit 3.
 `setup-mcp.ps1` always merges an existing config natively because PowerShell has a JSON parser; the `sh` manual-merge branch is unreachable on Windows. This asymmetry is deliberate. Invalid JSON and
 other existing-file setup failures on Windows also exit 3.
+
+A different exit 3: `already has a chrome-devtools entry without --autoConnect; not replacing it`.
+The existing entry is a fallback (`--browserUrl` or `--isolated`) and setup will not overwrite it
+unasked. Keep it and start the browser it points at, or re-run setup with `--force` (`-Force`) to go
+back to `--autoConnect`.
 
 Fix: preserve a copy of the existing file, repair its JSON or permissions, then rerun setup. On
 POSIX without Node, merge the printed `chrome-devtools` entry by hand, or install Node and rerun.
